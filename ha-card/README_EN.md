@@ -1,6 +1,6 @@
 # MTTL-W01 2.0 Home Assistant Card
 
-[한국어](README.md) | English
+English documentation
 
 A Lovelace card for standalone firmware 2.0.x, displaying total/per-channel sensors and timers. The card version does not need to match each firmware patch release.
 

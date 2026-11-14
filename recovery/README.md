@@ -1,108 +1,108 @@
 # MTTL-W01 Recovery 1.1
 
 
-한국어 | [English](README_EN.md)
+English documentation
 
-[복구 툴 다운로드](https://github.com/af950833/mttl_w01_standalone/releases/tag/recovery-v1.1) · [프로젝트](../README.md) · [제3자 구성 및 라이선스](THIRD_PARTY_NOTICES.md)
+[Download recovery tool](https://github.com/af950833/mttl_w01_standalone/releases/tag/recovery-v1.1) · [Project](../README_EN.md) · [Third-party components](THIRD_PARTY_NOTICES.md)
 
-웹 OTA를 사용할 수 없는 MTTL-W01의 **분리한 Wi-Fi 보드**를 ST Link V2/SWD로 읽고, 본인 기기의 백업을 보존하면서 순정 1.0.66으로 복구하는 Windows x64 포터블 도구입니다.
+A portable Windows x64 tool for reading a **fully detached MTTL-W01 Wi-Fi board** over ST Link V2/SWD and restoring stock 1.0.66 while preserving a verified backup from that same device.
 
-복구 툴 1.1은 2.1.0과 이전 독립펌웨어의 저장 영역을 처리해 순정 1.0.66으로 복구합니다. 기존 설정·누적량은 삭제됩니다. 실제 보드 복구 검증은 아직 하지 않았습니다.
+Recovery 1.1 handles storage from 2.1.0 and earlier standalone firmware and restores stock 1.0.66. Settings and energy history are erased. Physical recovery validation is still pending.
 
-![MTTL-W01 복구 툴 화면](docs/recovery-tool-1.0.0.png)
+![MTTL-W01 Recovery tool](docs/recovery-tool-1.0.0.png)
 
-## 반드시 확인할 안전 조건
+## Mandatory safety conditions
 
-**멀티탭 AC 전원 플러그를 뽑는 것만으로는 충분하지 않습니다. Wi-Fi 보드를 AC 보드와 모든 연결에서 완전히 분리한 뒤 작업하십시오. AC 보드와 ST Link V2·UART·USB·PC를 동시에 연결하지 마십시오.**
+**Unplugging the strip's mains cord alone is not sufficient. Fully disconnect the Wi-Fi board from the AC assembly and every interconnecting lead before connecting ST Link V2/USB/PC. Never connect the AC assembly and wired debug equipment together.**
 
-전원·GND·신호 전압을 확인하고 납땜할 수 있는 사람을 위한 도구입니다. 저전압 표기만으로 절연을 가정하면 안 됩니다. 전원 인가 상태에서 배선을 바꾸지 마십시오. 이 도구가 잘못된 배선이나 전기적 손상을 방지해 주지는 않습니다.
+This is for people capable of verifying power, ground, signal levels and solder connections. Low-voltage labels do not prove isolation. Do not change wiring while powered. Software cannot prevent electrical damage caused by unsafe wiring or power.
 
-## 지원 범위와 검증 상태
+## Scope and validation
 
-- Windows x64, ST Link V2와 SWD 연결. USB 드라이버는 별도 설치합니다.
-- 알려진 Cortex-M3/1MiB 플래시/부트 지문과 0xB000·0x80000 슬롯 구성만 허용합니다.
-- 순정펌웨어 **1.0.66**으로 복구합니다.
-- 한글·영문 GUI, 이중 백업, 진단, 복구 이미지 생성, 제한 영역 기록, 전체 재읽기 검증과 재부팅 흐름을 구현했습니다.
-- 오프라인 오류 주입·동작 검사와 EXE 실행 검증을 통과했습니다. **이 통합 도구의 실제 기기 기록·복구 부팅 시험은 아직 하지 않았습니다.**
-- 모든 보드 변형의 호환성, 복구 성공, 전원 차단 시 안전성을 보증하지 않습니다.
+- Windows x64, ST Link V2 and SWD. Install the USB driver separately.
+- Only the known Cortex-M3/1MiB flash/boot-code fingerprint and 0xB000/0x80000 slot layout are accepted.
+- Restores stock firmware **1.0.66**.
+- Korean/English GUI, double-backup, diagnosis, image planning, bounded writes, full readback verification and reset are implemented.
+- Offline fault-injection/workflow and frozen EXE checks passed. **Physical write and recovery boot have not been tested with this integrated tool.**
+- Compatibility with all board variants, successful recovery and power-loss safety are not guaranteed.
 
-## 준비물과 다운로드
+## Requirements and download
 
-1. [Recovery 1.1 Release](https://github.com/af950833/mttl_w01_standalone/releases/tag/recovery-v1.1)에서 `MTTL-Recovery-1.1-Windows-x64.zip`과 체크섬을 받습니다.
-2. ZIP의 전체 내용을 쓰기 가능한 폴더에 풉니다. EXE만 단독으로 옮기지 마십시오. `D:\MTTL-Recovery` 같은 짧은 영문 경로를 권장합니다.
-3. ST Link V2를 인식하지 못하면 [ST 공식 STSW-LINK009 드라이버](https://www.st.com/en/development-tools/stsw-link009.html)를 설치합니다.
-4. 최초 작업 시 인터넷이 필요합니다. 순정 1.0.66 FWR는 ZIP에 포함되어 있으며 파일 선택 없이 자동 사용합니다. OpenOCD만 공식 배포처에서 자동 다운로드합니다. 두 구성 모두 고정 SHA-256으로 검사합니다. 출처와 해시는 [제3자 안내](THIRD_PARTY_NOTICES.md)에 있습니다.
-5. 준비 후 해당 폴더를 유지하면 오프라인으로 사용할 수 있습니다. PATH·레지스트리·환경변수를 영구 변경하지 않으며 SDK·컴파일러·Python 설치도 필요하지 않습니다. 인터넷 제한·백신·보안 정책으로 다운로드가 실패하면 기기 연결 전에 중단합니다. 방화벽 전체 해제는 필요하지 않습니다.
+1. Get `MTTL-Recovery-1.1-Windows-x64.zip` and its checksum from [Recovery 1.1 Release](https://github.com/af950833/mttl_w01_standalone/releases/tag/recovery-v1.1).
+2. Extract the whole ZIP into a writable folder. Do not move the EXE alone. A short ASCII path such as `D:\MTTL-Recovery` is recommended.
+3. If necessary, install [ST's STSW-LINK009 USB driver](https://www.st.com/en/development-tools/stsw-link009.html).
+4. Internet access is required on first use. Stock 1.0.66 FWR is included in the ZIP and used automatically without file selection. Only OpenOCD is downloaded from its official release. Both components are checked against pinned SHA-256 values. Sources/hashes are in [third-party notices](THIRD_PARTY_NOTICES.md).
+5. Keep the prepared folder for offline use. No permanent PATH/environment/registry changes, SDK/compiler or Python installation are required. Download restrictions or security policies stop preparation before target access; do not disable the entire firewall.
 
-## ST Link V2 연결 사진
+## ST Link V2 wiring photos
 
-### ST Link V2 어댑터
+### ST Link V2 adapter
 
-![ST Link V2 어댑터와 연결 케이블](docs/st-link-v2.png)
+![ST Link V2 adapter and connected wires](docs/st-link-v2.png)
 
-사용자가 사용한 ST Link V2 어댑터 사진입니다. 케이블 색상만으로 신호를 판단하지 말고, 본인 어댑터의 핀 이름과 실제 출력을 확인하십시오.
+This is the ST Link V2 adapter used by the user. Do not identify signals by wire colour alone; verify your own adapter's pin labels and actual outputs.
 
-### Wi-Fi 보드 연결 위치
+### Wi-Fi board pad locations
 
-![분리한 Wi-Fi 보드의 ST Link V2 연결 위치](docs/stlink-wiring.jpg)
+![ST Link V2 pad locations on the detached Wi-Fi board](docs/stlink-wiring.jpg)
 
-사용자가 실제 사용한 보드에서 연결한 패드를 붉게 표시한 사진입니다. 전원이 꺼진 상태에서 보드 실크 인쇄와 실제 핀을 확인하십시오. 보드나 ST Link V2 호환품에 따라 외형·핀 배치가 달라질 수 있습니다.
+The red marks show the pads used on the user's board. Check silk labels and actual pads with power off. Board variants and ST Link V2 clones can have different layouts.
 
-| ST Link V2 측 | Wi-Fi 보드 패드 | 역할 |
+| ST Link V2 | Wi-Fi board pad | Purpose |
 |---|---|---|
-| SWDIO | JTAG_TMS1 | SWD 데이터 |
-| SWCLK | JTAG_CLK1 | SWD 클럭 |
-| GND | GND | 공통 접지 |
-| 확인된 5V 전원 출력 | VCC_5V | 분리한 Wi-Fi 보드 전원 |
+| SWDIO | JTAG_TMS1 | SWD data |
+| SWCLK | JTAG_CLK1 | SWD clock |
+| GND | GND | Common ground |
+| Verified 5V power output | VCC_5V | Detached Wi-Fi board supply |
 
-사진 우측 상단의 붉은 원은 **VCC_5V** 패드이며, 근처의 GND2와 혼동하지 마십시오. 사용자는 해당 보드와 본인 ST Link V2의 5V 출력 조합으로 동작을 확인했습니다. 모든 ST Link V2가 같은 출력을 제공한다는 뜻은 아닙니다. 어댑터의 실제 5V 출력·공급 용량을 확인하고 다른 전원과 중복 공급하지 마십시오. **5V를 SWDIO·SWCLK·DC33·VD33에 연결하면 안 됩니다.** 신호는 보드에 맞는 3.3V 레벨이어야 합니다. TDI·TDO·TRST는 이 2선 SWD 방식에 사용하지 않습니다.
+The upper-right red circle is **VCC_5V**, not the nearby GND2 pad. The user confirmed operation with this board and their own adapter's 5V output; this does not establish every adapter's output capability. Verify the actual 5V output and available current, and never feed a second supply simultaneously. **Never connect 5V to SWDIO, SWCLK, DC33 or VD33.** Debug signals must match the board's 3.3V logic. TDI/TDO/TRST are unused for two-wire SWD.
 
-## 사용 방법
+## Operation
 
-1. 보드 분리·배선·전원·드라이버를 확인한 뒤 `MTTL-Recovery.exe`를 실행합니다. 실행만으로 기기에 접속하지 않습니다.
-2. 우상단에서 한국어·영어를 선택합니다. 작업 중에는 언어·모드 변경과 창 닫기를 막습니다.
-3. 안전 확인 체크박스를 선택합니다.
-4. 기본은 **진단·이중 백업만 수행**입니다. 처음에는 그대로 `시작`을 눌러 연결·백업 상태부터 확인하는 것을 권장합니다.
-5. 실제 복구를 원하면 **순정 복구 실행**을 체크하고 **시작**을 누릅니다. 포함된 순정 1.0.66 펌웨어를 파일 선택 없이 자동 사용하며, 백업부터 복구·검증·재부팅까지 진행됩니다.
-6. 기록이 시작된 뒤에는 PC 절전·전원/USB 분리·프로그램 강제 종료를 하지 마십시오. 자세한 진행 상황은 상태 표시와 로그에 나옵니다.
-7. 기록과 재읽기 검증이 완료되면 자동으로 재부팅 명령을 보냅니다. 작업 완료 후 USB 전원을 끄고 ST Link V2와 연결선을 모두 분리하십시오. 전원이 없는 상태에서 Wi-Fi 보드를 AC 보드에 다시 연결하고 멀티탭을 완전히 재조립한 뒤 AC 전원을 연결하십시오. 이후 메인 버튼을 길게 눌러 순정 Wi-Fi 설정 모드로 진입하십시오. 실제 정상 부팅과 설정 AP 동작은 별도로 확인해야 합니다.
+1. Verify isolation, wiring, power and driver, then run `MTTL-Recovery.exe`. Launching the app alone does not connect to a target.
+2. Choose Korean/English at the top right. Language/mode changes and closing are blocked while a job runs.
+3. Select the safety-confirmation checkbox.
+4. The default is **diagnosis/double-backup only**. Initially use Start in this mode to check the connection and backups.
+5. For restoration, select **Restore stock firmware** and click **Start**. The included stock 1.0.66 firmware is used automatically without a file picker, followed by backup, restoration, verification and reboot.
+6. Do not suspend the PC, disconnect power/USB or force-close the app once writing has begun. Stage/status and detailed logs show progress.
+7. After writing and full readback verification succeed, the tool automatically sends a reboot command. Once the job is complete, disconnect USB power, then disconnect ST Link V2 and all debug wires. With all power disconnected, reconnect the Wi-Fi board to the AC assembly and fully reassemble the strip before connecting mains power. Then hold the main button to enter the stock Wi-Fi setup mode. Successful boot and setup AP operation must be checked separately.
 
-## 자동 처리 내용
+## Automatic workflow
 
-1. 프로그램·런타임 파일 무결성 검사 및 필요 파일 준비.
-2. ST Link V2/CPU/플래시 인식. 지원하지 않는 구성은 중단.
-3. 전체 1MiB 덤프 2회 읽기. 일치하는 원본 파일과 SHA-256을 저장.
-4. 부트 코드·슬롯 배치·보호 경계 확인. 백업 실패/불일치 상태에서는 기록하지 않음.
-5. 본인 덤프를 바탕으로 복구 이미지 생성. 다른 기기의 고유 정보를 사용하지 않음.
-6. 슬롯 2를 기록·검증·부팅 가능하게 만든 뒤 슬롯 1을 기록·검증. 정상 최종 상태는 슬롯 1 NEW, 슬롯 2 OLD.
-7. 이전 독립펌웨어 설정과 2.1.0의 128KiB 순환 저장 영역 **`0x70000–0x7FFFF`**, **`0xE0000–0xEFFFF`**를 초기화합니다. 손상·불완전 기록도 초기화 대상이며 별도 버전 선택은 필요 없습니다.
-8. 전체 플래시를 다시 읽어 예상 이미지와 바이트 단위 비교. 일치할 때만 재부팅 요청.
+1. Check application/runtime integrity and prepare missing files.
+2. Identify ST Link V2, CPU and flash; stop unsupported targets.
+3. Read the entire 1MiB flash twice. Save matching originals and SHA-256.
+4. Diagnose boot code, slots and protected boundaries. Failed/mismatching backups never permit writes.
+5. Generate a recovery image from that device's own dump, without importing donor identity data.
+6. Write/verify slot 2 and make it bootable before replacing/verifying slot 1. Final signatures: slot 1 NEW, slot 2 OLD.
+7. Clear legacy standalone settings and both 2.1.0 journal banks: **`0x70000–0x7FFFF`**, **`0xE0000–0xEFFFF`** (128KiB total). Corrupt or incomplete records are also cleared; no version selection is needed.
+8. Read back the full flash and compare byte-for-byte with the expected image. Request reset only on an exact match.
 
-전체 이미지를 만들어도 실제 기록은 변경 대상 영역만 수행합니다. `0x00000–0x0AFFF`와 `0xF0000–0xFFFFF`는 보존합니다. 부트로더·고유 정보·보정 영역을 덮는 전체 삭제 기능은 없습니다. 순정 자체의 등록 정보를 직접 초기화하는 기능도 아닙니다.
+A full recovery image is generated, but only intended changed regions are programmed. `0x00000–0x0AFFF` and `0xF0000–0xFFFFF` are preserved. There is no mass-erase or donor-full-image operation. This does not directly clear the stock firmware's own registration information.
 
-## 백업·진단 파일
+## Backup and diagnostic files
 
-프로그램의 `sessions/<날짜-고유값>/`에 다음 파일을 보관합니다.
+The app saves files under `sessions/<timestamp-unique-id>/`:
 
-- `backup-1.bin`, `backup-2.bin`: 본인 기기의 전체 원본 읽기.
-- `backup-verified.json`: 이중 백업 일치와 기기 진단 결과.
-- `recovery-image-PRIVATE.bin`, `plan.json`: 복구 예상 이미지와 기록 범위.
-- `readback.bin`, `verified-before-reset.json`: 최종 재읽기와 검증 결과.
-- `result.json`, `error.txt`(실패 시), `openocd.log`: 작업 결과·실패 위치·로그.
+- `backup-1.bin`, `backup-2.bin`: complete original reads from the device.
+- `backup-verified.json`: backup agreement and diagnosis.
+- `recovery-image-PRIVATE.bin`, `plan.json`: expected recovered image and write ranges.
+- `readback.bin`, `verified-before-reset.json`: final readback and verification.
+- `result.json`, `error.txt` on failure, and `openocd.log`: outcome, failure position and logs.
 
-파일은 해당 단계에 도달했을 때 생성됩니다. **덤프에는 비밀번호·기기 고유 정보가 포함될 수 있습니다. 폴더 전체를 이슈에 올리거나 다른 기기의 복구 이미지로 사용하지 마십시오.** `백업·로그 폴더` 버튼으로 열 수 있습니다. 작업마다 별도 폴더를 만들어 이전 백업을 덮지 않습니다.
+Files exist only once their stage is reached. **Dumps can contain passwords and device-specific information. Do not upload the entire session folder to an issue or use it to restore another device.** Use the Backup/logs folder button to open it. Each job creates a unique folder rather than overwriting previous backups.
 
-## 중단·오류 시
+## Troubleshooting
 
-- ST Link V2 미인식: 드라이버, USB 케이블, 보드 전원, SWDIO/SWCLK/GND 확인. 어댑터 여러 개를 동시에 연결하지 마십시오.
-- 백업 불일치: 납땜·접촉·전원·신호 상태를 확인합니다. 프로그램은 오류를 임의 보정하거나 기록을 강행하지 않습니다.
-- 지원하지 않는 구성/알 수 없는 부트: 안전 검사를 해제하지 말고 진단 단계에서 중단합니다.
-- 기록·검증 실패: 재부팅을 요청하지 않고 CPU 정지를 시도합니다. 원본 백업·로그를 보존하고, 전원을 임의로 재연결해 부팅하려 하지 마십시오.
-- 진단/백업만 성공: CPU가 정지 상태로 남습니다. 해당 작업이 완전히 끝난 뒤 분리한 보드 전원을 재연결하면 정상 부팅을 시도할 수 있습니다.
-- “검증 완료”는 정상 부팅이나 전기적 안전을 자동 입증하지 않습니다.
+- Adapter not found: check driver, USB cable, board power, SWDIO/SWCLK/GND. Connect only one debug adapter.
+- Backups differ: check solder joints, contacts, power and signals. The tool does not invent corrections or force writes.
+- Unsupported boot/layout: stop; do not bypass checks.
+- Write/readback failure: no reset is requested; CPU halt is attempted. Keep the original backup/logs and do not arbitrarily power-cycle to attempt boot.
+- Diagnosis-only success: CPU remains halted. After the job fully ends, power cycle the detached board to attempt normal boot.
+- Verified writing is not automatic proof of successful boot or electrical safety.
 
-## 소스·검증·라이선스
+## Source, validation and licenses
 
-[검증 범위](TEST_RESULT.md) · [MIT 라이선스](LICENSE) · [제3자 안내](THIRD_PARTY_NOTICES.md)
+[Validation scope](TEST_RESULT.md) · [MIT license](LICENSE) · [Third-party notices](THIRD_PARTY_NOTICES.md)
 
-프로그램 소스와 GPL 플래시 루틴의 대응 소스는 이 폴더와 ZIP에 함께 있습니다. `--self-test`는 필요 파일 준비, GUI·언어·FWR 해제·무결성·OpenOCD 버전만 검사하고 `self-test.json`을 만듭니다. ST Link V2 연결이나 타깃 읽기·기록은 하지 않습니다.
+Application source and matching GPL flasher source are supplied in this folder and the ZIP. `--self-test` prepares dependencies and checks GUI/languages/FWR decoding/runtime integrity/OpenOCD version, saving `self-test.json`. It does not connect to ST Link V2 or read/write a target.

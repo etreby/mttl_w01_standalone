@@ -19,9 +19,3 @@ The newly downloaded Windows compiler differs from the historical mixed local to
 The firmware source ZIP omits the original-decoder fixture check to avoid distributing the original firmware; format, checksum, hardware field, BIN/FWR roundtrip and setup ARM mock checks remain. Existing SDK enum ABI warnings are retained in the log and have not been resolved by this builder project.
 
 This package is for local testing, not a finalized public redistribution release. Third-party licensing and fresh-PC validation remain separate work. Tools download on first prepare; no toolchain/SDK archive is embedded in the builder ZIP. Build and download caches accumulate only in the builder home. The EXE is unsigned.
-
-## 한국어
-
-실제 EXE의 명령행 경로로 환경 확인과 FWR 빌드가 성공했습니다. GUI 창은 생성되지만 화면 자동 캡처가 검게 나오고 활성화 권한이 거부되어 마우스 조작·레이아웃 확인은 완료하지 못했습니다. 사용자가 화면을 직접 확인해 주세요.
-
-생성한 펌웨어는 공식 다운로드 컴파일러를 사용하므로 기존 배포본과 바이트가 완전히 같지는 않습니다. 형식 검사와 빌드는 통과했지만 이 결과물을 기기에 올려 검증하지는 않았습니다. 기존 동작 펌웨어를 대체하기 전에 복구 방법을 확보하고 테스트하십시오. GitHub 업로드는 하지 않았습니다.
