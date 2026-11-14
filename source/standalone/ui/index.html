@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MTTL-W01 독립 펌웨어 화면 초안</title>
+<title>MTTL-W01 · Local control</title>
 <style>
   :root{font:14px/1.5 "Segoe UI Variable","Apple SD Gothic Neo","Malgun Gothic",sans-serif;color:#1e293b;background:#f5f7fb;accent-color:#2563eb;--line:#e2e8f0;--muted:#64748b;--blue:#2563eb}
   *{box-sizing:border-box}body{margin:0}header{background:#0f172a;color:white;padding:22px max(24px,calc((100% - 1152px)/2));display:flex;justify-content:space-between;align-items:center;gap:16px}h1{font-size:21px;letter-spacing:-.6px;margin:0}h2{font-size:19px;letter-spacing:-.4px;margin:0 0 20px}
@@ -18,6 +18,15 @@
   #timer-editor>button{justify-self:center;width:auto;min-width:140px}#timer-editor>.name-editor>b{display:block;text-align:center}#timer-editor .row label{text-align:center}#timer-editor .row input{text-align:right}
   #log{height:600px}
   @media(max-width:900px){#timer-editor{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:480px){#timer-editor{grid-template-columns:1fr}}
+  :root{font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;color:#182638;background:#eef2f5;accent-color:#0b6b69;--line:#d5dee5;--muted:#536579;--blue:#0b6b69}
+  body{min-height:100vh}header{background:#142c3c;border-bottom:3px solid #27b6a9;padding-top:20px;padding-bottom:20px}header h1{font-size:23px;font-weight:750;letter-spacing:-.03em}main{margin-top:30px;margin-bottom:50px}
+  nav{background:#dfe8ec;padding:5px;border-radius:12px;margin-bottom:22px}nav button{background:transparent;border-radius:9px;color:#344b5e;padding:10px 15px}nav button[aria-selected=true]{background:#fff;color:#075955}
+  .panel,.channel{border-color:#cfdae1;border-radius:16px;box-shadow:0 5px 19px #0000000d}.panel{padding:28px}.device-heading h2{font-size:24px}
+  .summary{gap:10px}.summary div{background:#f2f7f7;border:1px solid #dbe9e8;border-radius:10px;padding:16px 10px}.summary small{font-size:12px;color:#4c6570}.summary b{font-size:20px;color:#143848}
+  .channels{gap:14px}.channel{border-top:4px solid #7b8e9a;padding:18px}.channel.on{border-top-color:#159b7d}.channel-head>h2{font-size:18px}.sensor{border-bottom:1px solid #e8eef1;padding-bottom:9px;margin:10px 0}
+  button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #5dbdb3;outline-offset:2px}.primary{background:#0b6b69;border-color:#0b6b69}.primary:hover:not(:disabled){background:#075653;border-color:#075653}.switch{background:#e9eff1;color:#253d4c}.switch.is-on,.channel.on .switch{background:#117a62;color:#fff}
+  input,select{background:#f7fafb}.meta b{font-weight:650;color:#243f50}.status{font-size:13px}.muted,.meta{font-size:13px}
+  @media(max-width:600px){header{padding:17px 18px}main{margin-top:18px}.panel{padding:19px}.summary{grid-template-columns:repeat(2,minmax(0,1fr))}.summary b{font-size:18px}.channels{gap:10px}.channel{padding:15px}nav{margin-inline:-2px}}
 </style>
 <header><h1>MTTL-W01</h1><div class="header-tools"><span class="badge" data-i18n="simulation">PC 모의 화면</span><button id="language" type="button">English</button></div></header>
 <main>
