@@ -18,15 +18,14 @@
   #timer-editor>button{justify-self:center;width:auto;min-width:140px}#timer-editor>.name-editor>b{display:block;text-align:center}#timer-editor .row label{text-align:center}#timer-editor .row input{text-align:right}
   #log{height:600px}
   @media(max-width:900px){#timer-editor{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:480px){.channels,#timer-editor{grid-template-columns:1fr}}
-  :root{font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;color:#182638;background:#eef2f5;accent-color:#0b6b69;--line:#d5dee5;--muted:#536579;--blue:#0b6b69}
-  body{min-height:100vh}header{background:#142c3c;border-bottom:3px solid #27b6a9;padding-top:20px;padding-bottom:20px}header h1{font-size:23px;font-weight:750;letter-spacing:-.03em}main{margin-top:30px;margin-bottom:50px}
-  nav{background:#dfe8ec;padding:5px;border-radius:12px;margin-bottom:22px}nav button{background:transparent;border-radius:9px;color:#344b5e;padding:10px 15px}nav button[aria-selected=true]{background:#fff;color:#075955}
-  .panel,.channel{border-color:#cfdae1;border-radius:16px;box-shadow:0 5px 19px #0000000d}.panel{padding:28px}.device-heading h2{font-size:24px}
-  .summary{gap:10px}.summary div{background:#f2f7f7;border:1px solid #dbe9e8;border-radius:10px;padding:16px 10px}.summary small{font-size:12px;color:#4c6570}.summary b{font-size:20px;color:#143848}
-  .channels{gap:14px}.channel{border-top:4px solid #7b8e9a;padding:18px}.channel.on{border-top-color:#159b7d}.channel-head>h2{font-size:18px}.sensor{border-bottom:1px solid #e8eef1;padding-bottom:9px;margin:10px 0}
-  button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #5dbdb3;outline-offset:2px}.primary{background:#0b6b69;border-color:#0b6b69}.primary:hover:not(:disabled){background:#075653;border-color:#075653}.switch{background:#e9eff1;color:#253d4c}.switch.is-on,.channel.on .switch{background:#117a62;color:#fff}
-  input,select{background:#f7fafb}.meta b{font-weight:650;color:#243f50}.status{font-size:13px}.muted,.meta{font-size:13px}
-  @media(max-width:600px){header{padding:17px 18px}main{margin-top:18px}.panel{padding:19px}.summary{grid-template-columns:repeat(2,minmax(0,1fr))}.summary b{font-size:18px}.channels{gap:10px}.channel{padding:15px}nav{margin-inline:-2px}}
+  :root{font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;color:#eaf3f6;background:#0c1925;accent-color:#31d6b1;--line:#344d5b;--muted:#9db3bf;--blue:#31d6b1}
+  body{min-height:100vh}header{background:#0c1925;padding-top:20px;padding-bottom:20px}header h1{font-size:23px;letter-spacing:-.03em}main{margin-top:30px;margin-bottom:50px}
+  nav{background:#172c3a;padding:5px;border:1px solid #294552;border-radius:12px;margin-bottom:22px}nav button{color:#afc4cd;padding:10px 15px}nav button[aria-selected=true]{background:#31d6b1;color:#07302b}
+  .panel,.channel{background:#142b3a;border:1px solid #315061;border-radius:18px;box-shadow:0 12px 28px #0004}.panel{padding:28px}.device-heading h2{font-size:28px;color:#fff}.meta b{color:#e1f8f0;font-weight:650}
+  .summary{gap:10px}.summary div{background:#0c202d;border:1px solid #315061;border-radius:12px;padding:17px 10px}.summary small{font-size:12px;color:#9db3bf}.summary b{font-size:22px;color:#62ead0}
+  .channels{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.channel{border-left:5px solid #526e7d;padding:20px}.channel.on{border-left-color:#31d6b1}.channel-head{border-bottom-color:#315061}.channel-head>h2{font-size:20px}.sensor{border-bottom:1px solid #284451;padding-bottom:9px;margin:10px 0}.sensor b{color:#f5fbff}.channel .switch{background:#274450;color:#e5f6f4}.channel .switch.is-on,.channel.on .switch{background:#31d6b1;color:#07302b}
+  button{background:#213b4a;color:#eaf3f6;border-color:#476676}button:hover{background:#2d5260;color:#fff}.primary{background:#31d6b1;border-color:#31d6b1;color:#07302b}.primary:hover:not(:disabled){background:#24bb9a;border-color:#24bb9a;color:#07302b}input,select{background:#0e2330;color:#fff}.name-editor{background:#0e2330}
+  @media(max-width:600px){header{padding:17px 18px}main{margin-top:18px}.panel{padding:19px}.summary{grid-template-columns:repeat(2,minmax(0,1fr))}.summary b{font-size:18px}.channels{grid-template-columns:1fr;gap:10px}.channel{padding:15px}nav{margin-inline:-2px}}
 </style>
 <header><h1>MTTL-W01</h1><div class="header-tools"><span class="badge" data-i18n="simulation">PC 모의 화면</span><button id="language" type="button">English</button></div></header>
 <main>

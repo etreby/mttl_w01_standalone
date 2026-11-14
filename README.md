@@ -13,9 +13,9 @@ Download and install the FWR below without building it yourself.
 Direct Wi-Fi web control and Home Assistant MQTT integration for the LG U+
 MTTL-W01, without a separate backend or router DNAT.
 
-![English-first MTTL-W01 dashboard preview with synthetic readings](docs/dashboard.png)
+![English-first MTTL-W01 dashboard preview with synthetic readings](docs/dashboard-dark.png)
 
-[View the mobile dashboard preview](docs/dashboard-mobile.png). The screenshots use synthetic documentation data and show the custom source on this fork branch. The downloadable 2.1.1 FWR below is the original upstream release; it does **not** include this redesigned interface. The custom image has not passed physical-device validation and is not published as a release.
+[View the mobile dashboard preview](docs/dashboard-dark-mobile.png). The screenshots use synthetic documentation data and show the custom source on this fork branch. The downloadable 2.1.1 FWR below is the original upstream release; it does **not** include this redesigned interface. The custom image has not passed physical-device validation and is not published as a release.
 
 ### Firmware download
 
