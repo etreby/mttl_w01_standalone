@@ -9,8 +9,8 @@ async function run(){
  timers.shift().fn();assert.equal(scripts[1].src,'/i18n.js');scripts[1].onload();
  assert.equal(notices[0].removed,true);assert.equal(scripts[2].src,'/live.js');
  scripts[2].onerror();timers.shift().fn();scripts[3].onload();assert.equal(scripts.length,4);
- const ids=['ota-hint','ota-file-label','firmware-update','firmware-status','firmware-picker','firmware-selected','firmware-file','language','firmware-form','current-build-id'];
- const nodes=Object.fromEntries(ids.map(id=>[id,{files:[],click(){}}]));nodes.language.onclick=()=>{};
+ const ids=['ota-hint','ota-file-label','firmware-update','firmware-status','firmware-picker','firmware-selected','firmware-file','language','firmware-form','current-build-id','firmware-sha','ota-sha-label'];
+ const nodes=Object.fromEntries(ids.map(id=>[id,{files:[],value:'',click(){}}]));nodes.language.onclick=()=>{};
  let tab,visible,calls=0,fail=true,pending=false;
  const jobs=new Map();let seq=0;
  const doc={documentElement:{lang:'en'},getElementById:id=>nodes[id],querySelector:()=>({addEventListener:(event,fn)=>tab=fn}),addEventListener:(event,fn)=>visible=fn};

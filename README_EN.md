@@ -115,7 +115,10 @@ Programs can request individual/all-channel ON/OFF through `POST /api/control` w
 3. Keep power connected, reconnect after automatic reboot and verify the build.
 
 Do not upload BIN files or full-flash dumps to the standalone updater.
-No manual SHA-256 or token is required; internal image/slot checks remain enabled.
+SHA-256 entry is optional. If you paste the SHA-256 that your OTA server publishes for
+the `.fwr` file into **Expected SHA-256**, the device hashes the raw upload and
+aborts with `SHA-256 mismatch; nothing activated` before activation if it differs.
+Leaving it empty keeps the previous behaviour. Internal image/slot checks remain enabled.
 If transfer disconnects, close other device tabs, check the running build, then retry.
 
 ## Restore to stock / local firmware
@@ -133,7 +136,8 @@ transfer and reboot. Other versions and arbitrary formats are unsupported.
 - To return to standalone, use the **initial-installation OTA tool** described above.
 
 There is no fixed file-digest allowlist. Image format, size, checksum, SHA-256
-receive/readback consistency and slot compatibility are still checked. These
+receive/readback consistency and slot compatibility are still checked; an optional
+expected file SHA-256 (`X-MTTL-SHA256`, see the [HTTP API](docs/HTTP_API_EN.md)) is compared before activation. These
 checks are not signature authentication; use FWR files from trusted sources only.
 The OTA/restore path passed 142 ARM-execution tests with mocked flash;
 restoration to local-patched `1.0.68` and successful boot have been verified on a physical device. Stock `1.0.66` restoration from standalone `2.0.9`, boot into the original setup AP, and normal operation after reprovisioning have also been confirmed on a user's device ([user verification report #2](https://github.com/af950833/mttl_w01_standalone/issues/2)).

@@ -26,6 +26,7 @@ if options.ota_test:
 <p id="ota-hint" class="muted"></p><form id="firmware-form">
 <label id="ota-file-label" for="firmware-picker"></label><input id="firmware-file" type="file" accept=".fwr" hidden>
 <div class="file-picker"><button id="firmware-picker" type="button" data-i18n="chooseFirmwareFile">파일 선택</button><span id="firmware-selected" class="muted" aria-live="polite"></span></div>
+<label id="ota-sha-label" for="firmware-sha"></label><input id="firmware-sha" maxlength="64" spellcheck="false" autocomplete="off">
 <div class="row"><button id="firmware-verify" type="button" hidden></button><button id="firmware-update" class="primary" disabled></button></div></form>
 <div id="firmware-status" class="status" role="status" aria-live="polite"></div><p class="muted" data-i18n="otaServerHint"></p></div></section>'''
     html=re.sub(r'<section id="firmware".*?</section>',lambda _:panel,html,flags=re.S)
@@ -59,6 +60,9 @@ html=html.replace('.note,','')
 for before,after in [('data-i18n="scan"','data-i18n="realScan"'),('data-i18n="connect"','data-i18n="realConnect"'),('data-i18n="saveMock"','data-i18n="saveDevice"'),('Wi-Fi 검색 모의','Wi-Fi 검색'),('연결 모의','연결'),('저장 모의','기기에 저장')]:
     html=html.replace(before,after)
 assert not any(sample in html for sample in ('192.0.2.10','02:00:00:00:00:01','SIMULATED_AP','1.551 kWh','220.0 V'))
+# live.js replaces every data-i18n element's text from i18n.js on load; the
+# Korean preview copy inside those elements is dead weight in device RAM.
+html=re.sub(r'(<(\w+)\s[^>]*data-i18n="[^"]+"[^>]*>)[^<]+(</\2>)',r'\1\3',html)
 html=re.sub(r'<!--.*?-->','',html,flags=re.S)
 html=re.sub(r'>\s+<','><',html)
 html=re.sub(r'<style>(.*?)</style>',lambda m:'<style>'+re.sub(r'\s*([{}:;,])\s*',r'\1',m[1])+'</style>',html,flags=re.S)

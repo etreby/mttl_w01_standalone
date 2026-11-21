@@ -52,6 +52,7 @@ if args.standalone:
  sources.append(ROOT/'standalone/firmware/ota_stage.c')
  sources.append(ROOT/'standalone/firmware/ota_identity.c')
  sources.append(ROOT/'standalone/firmware/ota_session.c')
+ sources.append(ROOT/'standalone/firmware/ota_upload.c')
  sources.append(ROOT/'standalone/firmware/http_framing.c')
  common += ['-I'+str(ROOT/'standalone/firmware')]
  sources.append(ROOT/'standalone/firmware/sdk_ota_flash.c')

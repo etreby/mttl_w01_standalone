@@ -23,9 +23,11 @@ cat > "$OUT/main.c" <<'EOF'
 #include <stdint.h>
 #include <stdio.h>
 extern uint32_t mttl_selftest(void);
-extern uint32_t mttl_test_count, mttl_failed_ids[64];
-int main(void) {
+extern uint32_t mttl_test_count, mttl_test_failed, mttl_failed_ids[64];
+extern void mttl_ota_upload_file_test(const char *, const char *, const char *);
+int main(int argc, char **argv) {
   uint32_t failed = mttl_selftest(), i;
+  if (argc == 4) { mttl_ota_upload_file_test(argv[1], argv[2], argv[3]); failed = mttl_test_failed; }
   printf("firmware selftest: %u checks, %u failed\n", (unsigned)mttl_test_count, (unsigned)failed);
   for (i = 0; i < failed && i < 64; i++) printf("  failed check #%u\n", (unsigned)mttl_failed_ids[i]);
   return failed != 0;
@@ -37,4 +39,9 @@ cd "$FW"
 # shellcheck disable=SC2086
 $CC -std=gnu11 -O1 -w -fno-builtin -DMTTL_SDK_FLASH_TEST -DMTTL_SDK_WIFI_TEST -I. -I"$MBED/include" \
   $SOURCES $EXTRA "$OUT/ota_hash_host.c" "$OUT/main.c" -o "$OUT/selftest"
-"$OUT/selftest"
+# Real published .fwr: expected digests come from sha256sum and the Python
+# reference decoder at test time, never from constants in the C code.
+FWR="$HERE/../../firmware/comMTTL-W01_2.1.1.fwr"
+FWR_SHA=$(sha256sum "$FWR" | cut -d' ' -f1)
+DECODED_SHA=$(cd "$HERE/.." && python3 -I -c 'import hashlib,sys;sys.path.insert(0,".");from standalone.ota import inspect_image;print(hashlib.sha256(inspect_image(open(sys.argv[1],"rb").read()).decoded).hexdigest())' "$FWR")
+"$OUT/selftest" "$FWR" "$FWR_SHA" "$DECODED_SHA"

@@ -73,3 +73,36 @@ Successful response:
 - `GET /api/control`: control diagnostics (`sequence`, `wait_ms`, `run_ms`, `busy`) only; no relay switching. No per-request completion acknowledgement ID is provided.
 
 The public firmware does not currently provide `/api/relay?ch=1&state=1` URL-based control. A request timeout does not prove the command was not accepted: check state rather than retrying blindly. Avoid flooding or unlimited retries.
+
+## Firmware upload: POST /api/firmware/upload
+
+Uploads a `.fwr` file into the inactive slot and, only after every check passes, activates it and reboots. The dashboard Firmware tab uses this endpoint.
+
+| Header | Required | Value |
+|---|---|---|
+| `Origin` | yes | `http://<current IPv4 address>` |
+| `Content-Type` | yes | `application/x-mttl-fwr` |
+| `Content-Length` | yes | Exact `.fwr` size (44 to 434196 bytes) |
+| `X-MTTL-SHA256` | no | 64 hexadecimal characters (either case): SHA-256 of the **raw `.fwr` file exactly as uploaded**, i.e. the value `sha256sum file.fwr` prints and an OTA server publishes |
+
+The body is the raw `.fwr` file. The whole request header block must fit in 1024 bytes; send `X-MTTL-SHA256` once (a duplicated header line is treated as absent).
+
+`X-MTTL-SHA256` behaviour:
+
+- **Absent:** unchanged behaviour; only the internal format/checksum/receive/readback/slot checks apply.
+- **Malformed** (not exactly 64 hex digits): `400 Malformed X-MTTL-SHA256; no write`, returned before any flash erase.
+- **Present:** the device hashes every received byte before decoding. If the digest differs, the session is aborted before `activate`, the running image stays active and the response is `400 SHA-256 mismatch; nothing activated`. The inactive slot may contain partially written data, which is never booted.
+
+`GET /api/firmware/status` reports `"sha256_header":true` on firmware that supports this header.
+
+```python
+import hashlib, urllib.request
+base = 'http://192.168.0.153'
+data = open('comMTTL-W01_2.1.1.fwr', 'rb').read()
+request = urllib.request.Request(base + '/api/firmware/upload', data=data, method='POST', headers={
+    'Origin': base, 'Content-Type': 'application/x-mttl-fwr',
+    'X-MTTL-SHA256': hashlib.sha256(data).hexdigest()})  # or the value published by your OTA server
+print(urllib.request.urlopen(request, timeout=180).read().decode())
+```
+
+Success responses are `{"written":true,"activated":true,"rebooting":true}` (optionally with `restore_version`) or `{"already_installed":true,"activated":false,"rebooting":false}`.
