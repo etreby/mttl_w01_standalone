@@ -103,6 +103,14 @@
     }catch(error){if(generation===firmwareGeneration){status('firmware-status',error.code&&MttlI18n.messages.ko[error.code]?error.code:'fwRead',true);log('log_fwFailed');}}
     finally{byId('firmware-verify').disabled=false;}
   });
+  byId('firmware-copy').addEventListener('click',async()=>{
+    const value=byId('firmware-hash').textContent;
+    try{if(!/^[0-9a-f]{64}$/.test(value))throw Error('hash');
+      if(navigator.clipboard&&globalThis.isSecureContext)await navigator.clipboard.writeText(value);
+      else{const range=document.createRange();range.selectNodeContents(byId('firmware-hash'));getSelection().removeAllRanges();getSelection().addRange(range);if(!document.execCommand('copy'))throw Error('copy');}
+      status('firmware-status','hashCopied');
+    }catch(_){status('firmware-status','copyFailed',true);}
+  });
   byId('firmware-form').addEventListener('submit',async event=>{
     event.preventDefault();if(firmwareBusy||!verifiedFirmware||verifiedFirmware.generation!==firmwareGeneration)return;firmwareBusy=true;['firmware-file','firmware-expected','firmware-verify','firmware-update'].forEach(id=>byId(id).disabled=true);byId('firmware-progress').hidden=false;
     try{for(const [percent,key] of [[25,'uploading'],[70,'rechecking'],[90,'rebooting'],[100,'updateComplete']]){byId('firmware-progress').value=percent;status('firmware-status',key);await new Promise(resolve=>setTimeout(resolve,450));}log('log_fwComplete');verifiedFirmware=null;}

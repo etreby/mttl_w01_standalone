@@ -27,7 +27,7 @@ if options.ota_test:
 <label id="ota-file-label" for="firmware-picker"></label><input id="firmware-file" type="file" accept=".fwr" hidden>
 <div class="file-picker"><button id="firmware-picker" type="button" data-i18n="chooseFirmwareFile">파일 선택</button><span id="firmware-selected" class="muted" aria-live="polite"></span></div>
 <div class="row"><button id="firmware-verify" type="button" hidden></button><button id="firmware-update" class="primary" disabled></button></div></form>
-<div id="firmware-status" class="status" role="status" aria-live="polite"></div></div></section>'''
+<div id="firmware-status" class="status" role="status" aria-live="polite"></div><p class="muted" data-i18n="otaServerHint"></p></div></section>'''
     html=re.sub(r'<section id="firmware".*?</section>',lambda _:panel,html,flags=re.S)
     # OTA initialization is bundled with the common controller below: it cannot
     # be lost independently while the rest of the dashboard appears healthy.
