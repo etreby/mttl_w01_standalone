@@ -104,4 +104,4 @@ Files exist only once their stage is reached. **Dumps can contain passwords and 
 
 [Validation scope](TEST_RESULT.md) · [MIT license](LICENSE) · [Third-party notices](THIRD_PARTY_NOTICES.md)
 
-Application source and matching GPL flasher source are supplied in this folder and the ZIP. `--self-test` prepares dependencies and checks GUI/languages/FWR decoding/runtime integrity/OpenOCD version, saving `self-test.json`. It does not connect to ST Link V2 or read/write a target.
+Application source and matching GPL flasher source are supplied in this folder and the ZIP. `--self-test` prepares dependencies and checks GUI/FWR decoding/runtime integrity/OpenOCD version, saving `self-test.json`. It does not connect to ST Link V2 or read/write a target.
