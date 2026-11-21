@@ -7,6 +7,9 @@ import json
 import re
 import argparse
 import subprocess
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from minify_markup import minify_css,minify_html,usage
 parser=argparse.ArgumentParser();parser.add_argument('--ota-test',action='store_true');options=parser.parse_args()
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'standalone/results/sdk'
@@ -65,7 +68,6 @@ for before,after in [('>Simulate Wi-Fi scan<','>Scan Wi-Fi<'),('>Simulate connec
 assert not any(sample in html for sample in ('192.0.2.10','02:00:00:00:00:01','SIMULATED_AP','1.551 kWh','220.0 V'))
 html=re.sub(r'<!--.*?-->','',html,flags=re.S)
 html=re.sub(r'>\s+<','><',html)
-html=re.sub(r'<style>(.*?)</style>',lambda m:'<style>'+re.sub(r'\s*([{}:;,])\s*',r'\1',m[1])+'</style>',html,flags=re.S)
 sources=[('/', 'text/html; charset=utf-8', html.encode()),
          ('/i18n.js','application/javascript; charset=utf-8',(ROOT/'standalone/ui/i18n.js').read_bytes()),
          ('/live.js','application/javascript; charset=utf-8',(ROOT/'standalone/ui/live.js').read_bytes())]
@@ -79,7 +81,13 @@ if options.ota_test:
     sources[-1]=('/live.js','application/javascript; charset=utf-8',sources[-1][2]+b'\n'+(ROOT/'standalone/ui/ota-live.js').read_bytes())
 # Load dependencies sequentially and retry failed downloads on every dashboard
 # tab. Keep this small bootstrap inline so it needs no additional HTTP request.
-loader=(ROOT/'standalone/ui/device-loader.js').read_text(encoding='utf-8')
+def minify_js(data):
+    # Drop only a leading explanatory JS block comment and whole-line comments.
+    data=re.sub(rb"^/\*.*?\*/\s*", b"", data, count=1, flags=re.S)
+    data=re.sub(rb"^\s*//[^\r\n]*",b"",data,flags=re.M)
+    return subprocess.check_output(['node',str(ROOT/'standalone/minify_ui.cjs')],input=data)
+loader=minify_js((ROOT/'standalone/ui/device-loader.js').read_bytes()).decode('utf-8')
+assert '</script' not in loader
 html=html.replace('<script src="i18n.js"></script>','').replace('<script src="live.js"></script>','<script>'+loader+'</script>')
 sources[0]=('/', 'text/html; charset=utf-8',html.encode())
 # Preview-only messages do not belong in the RAM-resident device image.
@@ -94,15 +102,15 @@ assert keys<=messages.keys(),'Missing messages: '+', '.join(sorted(keys-messages
 messages={key:value for key,value in messages.items() if key in keys or key.startswith('netState')}
 compact='globalThis.MttlI18n={messages:'+json.dumps(messages,ensure_ascii=False,separators=(',',':'))+',text:(key,args={})=>{const value=MttlI18n.messages[key];if(value===undefined)throw Error("Missing translation: "+key);return value.replace(/\\{(\\w+)\\}/g,(_,name)=>String(args[name]??""));}};'
 sources=[(path,kind,compact.encode() if path=='/i18n.js' else data) for path,kind,data in sources]
+sources=[(path,kind,minify_js(data) if path.endswith('.js') else data) for path,kind,data in sources]
+# Minify markup last, once every script that can add classes or elements is final.
+scripts='\n'.join(data.decode('utf-8') for path,kind,data in sources if path.endswith('.js'))+'\n'+loader
+html=re.sub(r'<style>(.*?)</style>',lambda m:'<style>'+minify_css(m[1],usage(html,scripts))+'</style>',html,flags=re.S)
+sources[0]=('/', 'text/html; charset=utf-8',minify_html(html).encode())
 lines=['/* Generated gzip UI assets. Do not edit by hand. */','#include <stddef.h>',
        'typedef struct { const char *path,*type; const unsigned char *data; size_t size; } mttl_asset;']
 meta=[]
 for i,(path,kind,data) in enumerate(sources):
-    # Drop only a leading explanatory JS block comment from device assets.
-    if path.endswith(".js"):
-        data=re.sub(rb"^/\*.*?\*/\s*", b"", data, count=1, flags=re.S)
-        data=re.sub(rb"^\s*//[^\r\n]*",b"",data,flags=re.M)
-        data=subprocess.check_output(['node',str(ROOT/'standalone/minify_ui.cjs')],input=data)
     text=data.decode('utf-8')
     assert not re.search('[\u1100-\u11ff\u3130-\u318f\uac00-\ud7a3]',text),'Non-English text in device asset: '+path
     assert not any(word in text.lower() for word in ('draft','simulat','experimental')),'Preview text in device asset: '+path

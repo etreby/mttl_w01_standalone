@@ -23,3 +23,5 @@ jobs:
           for t in source/standalone/tests/*.cjs ha-card/test_timer.cjs; do
             echo "== $t"; node "$t"
           done
+      - name: Device UI markup minifier tests
+        run: python3 source/standalone/tests/test_minify_markup.py

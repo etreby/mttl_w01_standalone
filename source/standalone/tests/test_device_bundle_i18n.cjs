@@ -16,10 +16,10 @@ function element(id,attributes={}){
 }
 function run(name,bundle){
  const ids=new Map(),errors=[];
- const declared=new Set([...bundle.html.matchAll(/\sid="([^"]+)"/g)].map(m=>m[1]));
+ const declared=new Set([...bundle.html.matchAll(/\sid=(?:"([^"]+)"|([^\s"'>]+))/g)].map(m=>m[1]??m[2]));
  const byId=id=>{if(!ids.has(id))ids.set(id,element(id));return ids.get(id);};
  const lookup=id=>{if(!declared.has(id)){errors.push('Missing element #'+id);return null;}return byId(id);};
- const tagged=[...bundle.html.matchAll(/<([a-z0-9]+)\s([^>]*)>/g)].map(([, ,attrs])=>{const a={};for(const [,k,v] of attrs.matchAll(/([\w-]+)(?:="([^"]*)")?/g))a[k]=v??'';return a.id?Object.assign(byId(a.id),{attributes:{...byId(a.id).attributes,...a}}):element(undefined,a);});
+ const tagged=[...bundle.html.matchAll(/<([a-z0-9]+)\s([^>]*)>/g)].map(([, ,attrs])=>{const a={};for(const [,k,q,u] of attrs.matchAll(/([\w-]+)(?:=(?:"([^"]*)"|([^\s"'>]+)))?/g))a[k]=q??u??'';return a.id?Object.assign(byId(a.id),{attributes:{...byId(a.id).attributes,...a}}):element(undefined,a);});
  const select=selector=>{const attr=selector.match(/^\[([\w-]+)\]$/)?.[1];if(attr)return tagged.filter(n=>attr in n.attributes);return Array.from({length:5},()=>element());};
  const document={documentElement:element('html',{lang:'en'}),body:element('body'),title:'',hidden:false,getElementById:lookup,querySelector:s=>select(s)[0]||element(),querySelectorAll:select,
   createElement:tag=>element(undefined,{tag}),createTextNode:text=>({textContent:text}),addEventListener(){}};
@@ -33,7 +33,10 @@ function run(name,bundle){
  vm.runInContext(bundle.i18n,context,{filename:name+'/i18n.js'});
  const text=context.MttlI18n.text;
  const missing=new Set();context.MttlI18n.text=(key,args)=>{try{return text(key,args);}catch(error){missing.add(key);throw error;}};
- for(const [,key] of bundle.live.matchAll(/\bt\(\s*["'](\w+)["']\s*[,)]/g))if(context.MttlI18n.messages[key]===undefined)missing.add(key);
+ // The bundle is minified (t() is renamed), so read the keys from the device sources.
+ const keys=new Set(['scheduler.js','timer.js','live.js','ota-live.js'].flatMap(file=>[...fs.readFileSync(path.join(__dirname,'../ui',file),'utf8').matchAll(/\bt\(\s*["'](\w+)["']\s*[,)]/g)].map(m=>m[1])));
+ assert.ok(keys.size>=10,'Expected literal t() keys in device sources');
+ for(const key of keys)if(context.MttlI18n.messages[key]===undefined)missing.add(key);
  for(let n=0;n<=6;n++)if(context.MttlI18n.messages['netState'+n]===undefined)missing.add('netState'+n);
  for(const [part,source] of Object.entries(bundle)){
   assert.ok(!/[\u1100-\u11ff\u3130-\u318f\uac00-\ud7a3]/.test(source),name+': non-English text in '+part);
