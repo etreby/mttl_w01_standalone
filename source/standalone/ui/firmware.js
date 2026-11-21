@@ -1,8 +1,11 @@
 /* Complete-file inspection. No socket, flash writer, boot activation or reset. */
 (function(root){
   'use strict';
-  const LOAD=0x10006000,RAM_SPAN=0x10070000-LOAD,FILE_CAP=0x70000;
-  const key=Uint8Array.from([0x3f,0x5a,0x27,0xe8,0xd8,0xfb,0x85,0xf9,0xbd,0x4d,0x51,0x19,0x6c,0x4f,0x51,0x59]);
+  // FILE_CAP matches the device upload limit in ota-live.js (0x6a014 bytes);
+  // ota.py keeps a looser 0x70000 prototype bound for offline analysis.
+  const LOAD=0x10006000,RAM_SPAN=0x10070000-LOAD,FILE_CAP=0x6a014;
+  // The FWR XOR key is derived per file from its plain 16-byte header (see ota.py fwr_key).
+  const XOR_BASE=Uint8Array.from([0xca,0x59,0x23,0xe7,0xd7,0x9a,0x84,0xe8,0x43,0xb3,0xaf,0xe7,0x94,0xb1,0xaf,0xa7]);
   const tail=Uint8Array.from([0x52,0x54,0x4b,0x57,0x69,0x6e,0,0xff,0,1,1,0,0x95,0x81,1,1,0,0,0,0]);
   function failure(code,message){const error=Error(message);error.code=code;return error;}
   function inspect(bytes){
@@ -20,7 +23,8 @@
   }
   function validate(bytes){
     if(!(bytes instanceof Uint8Array)||bytes.length<44||bytes.length>FILE_CAP)throw failure('fwSize','파일 크기가 검사 범위를 벗어납니다.');
-    const decoded=Uint8Array.from(bytes);for(let i=16;i<decoded.length;i++)decoded[i]^=key[i%16];
+    const key=XOR_BASE.map((seed,i)=>((seed^bytes[i])+1)&255),decoded=Uint8Array.from(bytes);
+    for(let i=16;i<decoded.length;i++)decoded[i]^=key[i%16];
     for(const [format,data] of [['Image2 BIN',bytes],['LG U+ FWR (XOR)',decoded]]){
       try{return {...inspect(data),format,size:bytes.length};}catch(error){/* try other representation */}
     }
