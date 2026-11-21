@@ -116,6 +116,26 @@ python3 source/standalone/pull_manifest.py sign --key seed.hex --fwr comMTTL-W01
 python3 source/standalone/pull_manifest.py verify --pubkey <64 hex> < manifest.json
 ```
 
+## Ed25519 on the device: mask-ROM verifier
+
+Device builds (`-DMTTL_ED25519_ROM`) verify with the chip's mask-ROM export
+`rom_ed25519_crypto_sign_verify_detached` (`export-rom_v03.txt`, 0x1d655;
+libsodium-style prototype as in Realtek's `rom_homekit_ed25519.h`) through
+`firmware/ed25519_rom.c`, instead of linking the bundled TweetNaCl verifier
+(`ed25519_verify.c`, kept for host builds and as the test reference).
+
+- Size: 433 bytes (wrapper, known-answer vectors, state) instead of 5660 bytes
+  of code plus 4928 bytes of static workspace.
+- Because the ROM ABI is undocumented for this chip, the ROM verifier is
+  trusted only after a one-time known-answer test (RFC 8032 TEST 1 must verify
+  and a one-bit-tampered copy must not). It runs lazily on the first
+  verification (an explicit user action), never at boot. If it fails, every
+  verification returns invalid and pull checks stay disabled.
+- `S >= L` is rejected before the ROM is called.
+- The trusted public key is `firmware/pull_key.h`.
+- Not yet validated on hardware: ROM call ABI, stack use inside the ROM, and
+  verification time.
+
 ## Device check order
 
 1. Parse strictly (bounded, no escapes, exactly seven members).

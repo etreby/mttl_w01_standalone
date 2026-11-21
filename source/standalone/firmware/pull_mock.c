@@ -5,6 +5,8 @@
  * must agree byte for byte with the server-side reference. */
 #include "ed25519_verify.h"
 #include "pull_update.h"
+#include "ed25519_rom.h"
+#include "pull_key.h"
 #include <string.h>
 extern unsigned mttl_test_count,mttl_test_failed,mttl_failed_ids[64];
 static void check(int ok){++mttl_test_count;if(!ok&&mttl_test_failed<64)mttl_failed_ids[mttl_test_failed++]=mttl_test_count;}
@@ -31,7 +33,30 @@ static int edit(const char *from,const char *to,uint32_t now){ /* first occurren
  static char t[1100];mttl_pull_manifest m;const char *p=strstr(m_ok,from);size_t a;if(!p)return -1;a=(size_t)(p-m_ok);
  memcpy(t,m_ok,a);strcpy(t+a,to);strcat(t,p+strlen(from));return manifest(t,now,1,&m);
 }
+
+/* ROM wrapper tests: TweetNaCl stands in for the mask-ROM verifier (same libsodium ABI). */
+static uint8_t adapter_buf[64+1100];
+static int good_rom(const unsigned char *sig,const unsigned char *m,unsigned long long n,const unsigned char *pk){
+ if(n>1100)return -1;memcpy(adapter_buf+64,m,(size_t)n);return mttl_ed25519_verify(sig,pk,adapter_buf,(size_t)n)?0:-1;}
+static int always_valid(const unsigned char *sig,const unsigned char *m,unsigned long long n,const unsigned char *pk){(void)sig;(void)m;(void)n;(void)pk;return 0;}
+static int always_invalid(const unsigned char *sig,const unsigned char *m,unsigned long long n,const unsigned char *pk){(void)sig;(void)m;(void)n;(void)pk;return -1;}
+static void rom_wrapper_test(void){
+ uint8_t pk[32],sig[64],msg[1100];size_t n;unsigned i;int state=0;static const uint8_t key[32]=MTTL_PULL_PUBLIC_KEY;
+ for(i=0;i<sizeof(rfc)/sizeof(rfc[0]);i++){unhex(rfc[i].pk,pk);unhex(rfc[i].sig,sig);n=unhex(rfc[i].msg,msg);
+  check(mttl_ed25519_verify_with(good_rom,&state,sig,pk,msg,n)==1);sig[5]^=1;check(mttl_ed25519_verify_with(good_rom,&state,sig,pk,msg,n)==0);}
+ check(state==1);
+ unhex(rfc[0].pk,pk);unhex(rfc[0].sig,sig);
+ state=0;check(mttl_ed25519_verify_with(always_valid,&state,sig,pk,msg,0)==0&&state==-1); /* KAT rejects a verifier that accepts tampering */
+ check(mttl_ed25519_verify_with(always_valid,&state,sig,pk,msg,0)==0&&state==-1);   /* and stays disabled */
+ state=0;check(mttl_ed25519_verify_with(always_invalid,&state,sig,pk,msg,0)==0&&state==-1);
+ state=0;check(mttl_ed25519_verify_with(0,&state,sig,pk,msg,0)==0&&state==-1);
+ check(mttl_ed25519_s_canonical(sig)==1);
+ {uint8_t high[64];memcpy(high,sig,64);memset(high+32,0xff,32);check(!mttl_ed25519_s_canonical(high));
+  state=1;check(mttl_ed25519_verify_with(always_valid,&state,high,pk,msg,0)==0);} /* S >= L rejected before the ROM */
+ check(key[0]==0xd3&&key[31]==0xbd&&sizeof(key)==32);
+}
 void mttl_pull_test(void){
+ rom_wrapper_test();
  uint8_t pk[32],sig[64],digest[64],want[64];size_t i,n;mttl_pull_manifest m,m2;mttl_pull st;uint32_t ip,len;uint16_t port,ver[3];char req[MTTL_PULL_CANONICAL_MAX];
  /* SHA-512("abc") (FIPS 180-2) and the RFC 8032 positive vectors. */
  mttl_sha512(digest,(const uint8_t *)"abc",3);unhex("ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f",want);check(!memcmp(digest,want,64));
