@@ -121,6 +121,8 @@ aborts with `SHA-256 mismatch; nothing activated` before activation if it differ
 Leaving it empty keeps the previous behaviour. Internal image/slot checks remain enabled.
 If transfer disconnects, close other device tabs, check the running build, then retry.
 
+A future opt-in **pull update check** (signed manifest from your own OTA server, explicit check and install clicks only) is specified in [docs/PULL_UPDATE_EN.md](docs/PULL_UPDATE_EN.md). It is not in the firmware image yet.
+
 ## Restore to stock / local firmware
 
 Stock `1.0.66` FWR is available in the [original repository's stock firmware directory](https://github.com/af950833/mttl_w01/tree/main/work/firmware/1.0.66).

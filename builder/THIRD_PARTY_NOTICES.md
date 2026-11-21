@@ -16,6 +16,10 @@ This builder is for local Windows x64 use. It makes no system installation, glob
 
 Exact URLs, versions, sizes and SHA-256 digests are in `dependencies.lock.json`. Retain original download archives and extracted license files in the cache. Downloading dependencies separately does not remove license obligations for a resulting firmware distribution.
 
+## Vendored source
+
+- **TweetNaCl 20140427** (Daniel J. Bernstein, Bernard van Gastel, Wesley Janssen, Tanja Lange, Peter Schwabe, Sjaak Smetsers): public domain, https://tweetnacl.cr.yp.to/. `source/standalone/firmware/ed25519_verify.c` is a modified verify-only subset (SHA-512, field arithmetic, Ed25519 verification) of `tweetnacl.c` (original SHA-256 `02e65bc3013ff2168983365e55906bc783c4c7e0a60d8100f17bb303a17175c4`). Modifications are listed in the file header. It is currently compiled only into the host self-test, not into the device firmware.
+
 ## Builder EXE
 
 The EXE is a PyInstaller one-directory package containing Python/Tcl/Tk. Retain its bundled `licenses` folder and license files under `_internal`. Python uses PSF terms, Tcl/Tk their own notices, and PyInstaller GPL with its bootloader exception. The EXE is an unsigned test build; review Windows or security-product warnings before running it.

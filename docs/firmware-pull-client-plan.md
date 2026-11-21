@@ -2,6 +2,8 @@
 
 Status: **plan only**. Do not flash a device or start an unattended update.
 
+> Superseded in part by [PULL_UPDATE_EN.md](PULL_UPDATE_EN.md): the device cannot afford TLS, so the manifest contract uses plain HTTP on the LAN with an Ed25519-signed manifest and the signed SHA-256 of the image instead of HTTPS.
+
 ## Fork baseline
 
 - Repository: `etreby/mttl_w01_standalone`
