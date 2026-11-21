@@ -21,24 +21,26 @@ html=html.replace('<section id="device" class="active"','<section id="device"')
 html=html.replace('<section id="wifi" role=','<section id="wifi" class="active" role=')
 if options.ota_test:
     panel='''<section id="firmware" role="tabpanel" aria-labelledby="tab-firmware"><div class="panel">
-<h2 data-i18n="firmware">펌웨어</h2><div class="sensor"><span data-i18n="currentVersion">현재 버전</span><b id="current-firmware-version">2.1.1</b></div>
+<h2>Firmware</h2><div class="sensor"><span>Current version</span><b id="current-firmware-version">2.1.1</b></div>
 <div class="sensor"><span>Build ID</span><b id="current-build-id">—</b></div>
 <p id="ota-hint" class="muted"></p><form id="firmware-form">
 <label id="ota-file-label" for="firmware-picker"></label><input id="firmware-file" type="file" accept=".fwr" hidden>
-<div class="file-picker"><button id="firmware-picker" type="button" data-i18n="chooseFirmwareFile">파일 선택</button><span id="firmware-selected" class="muted" aria-live="polite"></span></div>
+<div class="file-picker"><button id="firmware-picker" type="button">Choose file</button><span id="firmware-selected" class="muted" aria-live="polite"></span></div>
 <label id="ota-sha-label" for="firmware-sha"></label><input id="firmware-sha" maxlength="64" spellcheck="false" autocomplete="off">
 <div class="row"><button id="firmware-verify" type="button" hidden></button><button id="firmware-update" class="primary" disabled></button></div></form>
-<div id="firmware-status" class="status" role="status" aria-live="polite"></div><p class="muted" data-i18n="otaServerHint"></p></div></section>'''
-    html=re.sub(r'<section id="firmware".*?</section>',lambda _:panel,html,flags=re.S)
+<div id="firmware-status" class="status" role="status" aria-live="polite"></div><p class="muted">Download firmware only from your OTA server and compare the file SHA-256 with the value it publishes before uploading.</p></div></section>'''
+    html,count=re.subn(r'<section id="firmware".*?</section>',lambda _:panel,html,flags=re.S)
+    assert count==1,'Missing firmware panel'
     # OTA initialization is bundled with the common controller below: it cannot
     # be lost independently while the rest of the dashboard appears healthy.
 else:
-    # The no-OTA device build keeps the inert firmware panel, but its preview
-    # copy uses translations that are pruned below; drop or relabel it.
-    for pattern,replacement in [(r'<p class="muted" data-i18n="firmwareHint">.*?</p>',''),
+    # The no-OTA device build keeps the inert firmware panel; drop or relabel
+    # its preview-only copy.
+    for pattern,replacement in [(r'<p class="muted">Current: standalone firmware preview.*?</p>',''),
                                 (r'<progress id="firmware-progress".*?</progress>',''),
                                 (r'<ol class="firmware-steps">.*?</ol>',''),
-                                (r'data-i18n="updateMock"','data-i18n="firmwareUpdate"')]:
+                                (r'>Simulate update<','>Update<'),
+                                (r'(<div id="firmware-status"[^>]*>)[^<]*','\\1Not connected')]:
         html,count=re.subn(pattern,replacement,html,flags=re.S)
         assert count==1,'Missing preview firmware markup: '+pattern
 # Device assets must not briefly display PC sample readings before JavaScript loads.
@@ -57,12 +59,10 @@ html=re.sub(r'<title>.*?</title>', '<title>MTTL-W01</title>',html,flags=re.S)
 html=re.sub(r'<p class="note".*?</p>', '',html,flags=re.S)
 html=re.sub(r'<span class="badge".*?</span>', '',html,flags=re.S)
 html=html.replace('.note,','')
-for before,after in [('data-i18n="scan"','data-i18n="realScan"'),('data-i18n="connect"','data-i18n="realConnect"'),('data-i18n="saveMock"','data-i18n="saveDevice"'),('Wi-Fi 검색 모의','Wi-Fi 검색'),('연결 모의','연결'),('저장 모의','기기에 저장')]:
+for before,after in [('>Simulate Wi-Fi scan<','>Scan Wi-Fi<'),('>Simulate connection<','>Connect<'),('>Simulate saving<','>Save to device<')]:
+    assert html.count(before)==1,'Missing preview label: '+before
     html=html.replace(before,after)
 assert not any(sample in html for sample in ('192.0.2.10','02:00:00:00:00:01','SIMULATED_AP','1.551 kWh','220.0 V'))
-# live.js replaces every data-i18n element's text from i18n.js on load; the
-# Korean preview copy inside those elements is dead weight in device RAM.
-html=re.sub(r'(<(\w+)\s[^>]*data-i18n="[^"]+"[^>]*>)[^<]+(</\2>)',r'\1\3',html)
 html=re.sub(r'<!--.*?-->','',html,flags=re.S)
 html=re.sub(r'>\s+<','><',html)
 html=re.sub(r'<style>(.*?)</style>',lambda m:'<style>'+re.sub(r'\s*([{}:;,])\s*',r'\1',m[1])+'</style>',html,flags=re.S)
@@ -82,20 +82,17 @@ if options.ota_test:
 loader=(ROOT/'standalone/ui/device-loader.js').read_text(encoding='utf-8')
 html=html.replace('<script src="i18n.js"></script>','').replace('<script src="live.js"></script>','<script>'+loader+'</script>')
 sources[0]=('/', 'text/html; charset=utf-8',html.encode())
-# Preview-only translations do not belong in the RAM-resident device image.
-# Retain literal keys in HTML/JS, plus dynamically constructed state keys.
+# Preview-only messages do not belong in the RAM-resident device image.
+# Device scripts look messages up only through literal t('key') calls, plus
+# the computed t('netState'+n) state names.
 messages=json.loads(subprocess.check_output(['node','-e',
     'console.log(JSON.stringify(require(process.argv[1]).messages))',
     str(ROOT/'standalone/ui/i18n.js')],text=True,encoding='utf-8'))
-messages['ko']['saveDevice']='기기에 저장';messages['en']['saveDevice']='Save to device'
-# The broad literal-key scan also sees element IDs such as 'scan'/'online'.
-# Those are not calls to preview translations; explicitly exclude their text.
-preview_keys={'title','simulation','note','online','hold','holdHint','scan','connect','saveMock','enabled','wifiConnected','firmwareHint','updateMock','progressLabel','firmwareStep2','firmwareStep3','inspectionPassed','uploading','rechecking','rebooting','updateComplete','log_started','log_wifi','log_fwComplete','deviceIntegration','liveNote'}
-messages={lang:{key:value for key,value in values.items() if key not in preview_keys} for lang,values in messages.items()}
 used='\n'.join(data.decode('utf-8') for path,kind,data in sources if path!='/i18n.js')
-messages={lang:{key:value for key,value in values.items() if any(quote+key+quote in used for quote in ('"',"'")) or key.startswith('netState')}
-          for lang,values in messages.items()}
-compact='globalThis.MttlI18n={messages:'+json.dumps(messages,ensure_ascii=False,separators=(',',':'))+',text:(language,key,args={})=>{const value=MttlI18n.messages[language==="en"?"en":"ko"][key];if(value===undefined)throw Error("Missing translation: "+key);return value.replace(/\\{(\\w+)\\}/g,(_,name)=>String(args[name]??""));}};'
+keys=set(re.findall(r"\bt\(\s*['\"](\w+)['\"]\s*[,)]",used))
+assert keys<=messages.keys(),'Missing messages: '+', '.join(sorted(keys-messages.keys()))
+messages={key:value for key,value in messages.items() if key in keys or key.startswith('netState')}
+compact='globalThis.MttlI18n={messages:'+json.dumps(messages,ensure_ascii=False,separators=(',',':'))+',text:(key,args={})=>{const value=MttlI18n.messages[key];if(value===undefined)throw Error("Missing translation: "+key);return value.replace(/\\{(\\w+)\\}/g,(_,name)=>String(args[name]??""));}};'
 sources=[(path,kind,compact.encode() if path=='/i18n.js' else data) for path,kind,data in sources]
 lines=['/* Generated gzip UI assets. Do not edit by hand. */','#include <stddef.h>',
        'typedef struct { const char *path,*type; const unsigned char *data; size_t size; } mttl_asset;']
@@ -106,9 +103,9 @@ for i,(path,kind,data) in enumerate(sources):
         data=re.sub(rb"^/\*.*?\*/\s*", b"", data, count=1, flags=re.S)
         data=re.sub(rb"^\s*//[^\r\n]*",b"",data,flags=re.M)
         data=subprocess.check_output(['node',str(ROOT/'standalone/minify_ui.cjs')],input=data)
-    if options.ota_test:
-        text=data.decode('utf-8').lower()
-        assert not any(word in text for word in ('초안','모의','흐름 확인','draft','simulat','experimental')), 'Preview text in device asset: '+path
+    text=data.decode('utf-8')
+    assert not re.search('[\u1100-\u11ff\u3130-\u318f\uac00-\ud7a3]',text),'Non-English text in device asset: '+path
+    assert not any(word in text.lower() for word in ('draft','simulat','experimental')),'Preview text in device asset: '+path
     zipped=zopfli.gzip.compress(data,numiterations=30)
     assert gzip.decompress(zipped)==data
     lines.append('static const unsigned char mttl_asset_%d[]={%s};'%(i,','.join(map(str,zipped))))

@@ -22,13 +22,13 @@
     return {body,load,entry,checksum,versions};
   }
   function validate(bytes){
-    if(!(bytes instanceof Uint8Array)||bytes.length<44||bytes.length>FILE_CAP)throw failure('fwSize','파일 크기가 검사 범위를 벗어납니다.');
+    if(!(bytes instanceof Uint8Array)||bytes.length<44||bytes.length>FILE_CAP)throw failure('fwSize','The file size is outside the inspection budget.');
     const key=XOR_BASE.map((seed,i)=>((seed^bytes[i])+1)&255),decoded=Uint8Array.from(bytes);
     for(let i=16;i<decoded.length;i++)decoded[i]^=key[i%16];
     for(const [format,data] of [['Image2 BIN',bytes],['LG U+ FWR (XOR)',decoded]]){
       try{return {...inspect(data),format,size:bytes.length};}catch(error){/* try other representation */}
     }
-    throw failure('fwImage','Image2 헤더·진입점·파일 길이·체크섬 검사에 실패했습니다.');
+    throw failure('fwImage','Image2 header, entry point, file length or checksum validation failed.');
   }
   async function sha256(bytes,cryptoApi){
     const digest=await cryptoApi.subtle.digest('SHA-256',bytes);
@@ -36,8 +36,8 @@
   }
   function expectedHash(actual,expected){
     if(!expected)return;
-    if(!/^[0-9a-fA-F]{64}$/.test(expected))throw failure('fwHashSyntax','예상 SHA-256은 64자리 16진수여야 합니다.');
-    if(actual!==expected.toLowerCase())throw failure('fwHashMismatch','예상 SHA-256과 파일이 일치하지 않습니다.');
+    if(!/^[0-9a-fA-F]{64}$/.test(expected))throw failure('fwHashSyntax','Expected SHA-256 must contain 64 hexadecimal digits.');
+    if(actual!==expected.toLowerCase())throw failure('fwHashMismatch','The file does not match the expected SHA-256.');
   }
   const api={validate,sha256,expectedHash,FILE_CAP};
   if(typeof module==='object'&&module.exports)module.exports=api;

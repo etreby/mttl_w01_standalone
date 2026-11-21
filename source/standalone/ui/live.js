@@ -2,7 +2,7 @@
 (function(){
   'use strict';
   const el=id=>document.getElementById(id),key='mttl.preview.display.v1';
-  let language='en',preferences={},snapshot=null,deviceSnapshot=null,configuration=null,composing=false,wifiMessage=null,controlBusy=false;
+  let preferences={},snapshot=null,deviceSnapshot=null,configuration=null,composing=false,wifiMessage=null,controlBusy=false;
   let events=null,eventConnected=false;
   let relaySnapshot=null;
   function applyRelay(){if(!relaySnapshot||!deviceSnapshot)return;deviceSnapshot.channels.forEach((c,i)=>{c.on=relaySnapshot.known&(1<<i)?!!(relaySnapshot.on&(1<<i)):null;});if(relaySnapshot.fault)deviceSnapshot.hardware_ready=false;}
@@ -16,7 +16,7 @@
     const now=(snapshot.uptime_ms+Date.now()-statusAt)>>>0,left=Math.max(0,(deviceSnapshot.timer_end[i]-now)|0),s=Math.ceil(left/1000);
     return [Math.floor(s/3600),Math.floor(s/60)%60,s%60].map(v=>String(v).padStart(2,'0')).join(':');
   }
-  function drawTimers(){channelNodes.forEach((n,i)=>{n.timerLabel.textContent=t('timer');n.timer.textContent=timerText(i);});timerEditor.show(Array.from({length:4},(_,i)=>t('timer')+' '+timerText(i)));}
+  function drawTimers(){channelNodes.forEach((n,i)=>{n.timerLabel.textContent='Timer';n.timer.textContent=timerText(i);});timerEditor.show(Array.from({length:4},(_,i)=>'Timer '+timerText(i)));}
   function timerClock(){drawTimers();setTimeout(timerClock,999);}
   const lockPending=new Set();let lockTail=Promise.resolve();
   async function toggleLock(i){
@@ -27,23 +27,23 @@
       const fresh=await request('/api/config');
       const desired=(fresh.button_lock||0)^(1<<i);
       await storeConfiguration({...fresh,button_lock:desired});
-      logEvent('물리 버튼 잠금 설정을 저장했습니다.','Physical button lock saved.');
-    }catch(_){logEvent('잠금 설정 저장 여부를 확인하지 못했습니다. 기기 상태를 다시 확인하세요.','Lock save could not be confirmed; check the device state.');}
+      logEvent('Physical button lock saved.');
+    }catch(_){logEvent('Lock save could not be confirmed; check the device state.');}
     finally{lockPending.delete(i);release();render();}
   }
   // Bounded browser-session diagnostics, never configuration or credentials.
   const logRows=[];let lastObserved=null;
-  function renderLog(){const box=el('log');box.textContent=logRows.length?logRows.map(row=>'['+row.at+'] '+(language==='en'?row.en:row.ko)).join('\n'):(language==='en'?'Browser-session events only; not stored in device.':'브라우저 세션 로그 · 기기에 저장되지 않습니다.');if(el('autoscroll').checked)box.scrollTop=box.scrollHeight;}
-  function logEvent(ko,en){logRows.push({at:new Date().toLocaleTimeString(),ko,en});if(logRows.length>200)logRows.shift();renderLog();}
+  function renderLog(){const box=el('log');box.textContent=logRows.length?logRows.map(row=>'['+row.at+'] '+row.text).join('\n'):'Browser-session events only; not stored in device.';if(el('autoscroll').checked)box.scrollTop=box.scrollHeight;}
+  function logEvent(text){logRows.push({at:new Date().toLocaleTimeString(),text});if(logRows.length>200)logRows.shift();renderLog();}
   function observe(){
     const current={available:!!snapshot,network:snapshot?.state,mqtt:deviceSnapshot?.mqtt_state,uptime:snapshot?.uptime_ms,on:deviceSnapshot?.channels?.map(c=>c.on)};
     if(lastObserved){
-      if(current.available!==lastObserved.available)logEvent(current.available?'기기 API 연결 복구':'기기 API 응답 없음',current.available?'Device API recovered':'Device API unavailable');
-      if(current.available&&lastObserved.available&&current.uptime<lastObserved.uptime)logEvent('기기 재부팅 감지','Device reboot observed');
-      if(Number.isInteger(current.network)&&current.network!==lastObserved.network)logEvent('Wi-Fi 상태: '+t('netState'+current.network),'Wi-Fi state: '+MttlI18n.text('en','netState'+current.network));
-      if(Number.isInteger(current.mqtt)&&current.mqtt!==lastObserved.mqtt)logEvent('MQTT 상태 코드: '+current.mqtt,'MQTT state code: '+current.mqtt);
-      if(current.on&&lastObserved.on)current.on.forEach((on,i)=>{if(typeof on==='boolean'&&on!==lastObserved.on[i])logEvent('채널 '+(i+1)+' 확인 상태: '+(on?'ON':'OFF'),'Channel '+(i+1)+' confirmed state: '+(on?'ON':'OFF'));});
-    }else if(current.available)logEvent('기기 상태 관찰 시작','Device state observation started');
+      if(current.available!==lastObserved.available)logEvent(current.available?'Device API recovered':'Device API unavailable');
+      if(current.available&&lastObserved.available&&current.uptime<lastObserved.uptime)logEvent('Device reboot observed');
+      if(Number.isInteger(current.network)&&current.network!==lastObserved.network)logEvent('Wi-Fi state: '+t('netState'+current.network));
+      if(Number.isInteger(current.mqtt)&&current.mqtt!==lastObserved.mqtt)logEvent('MQTT state code: '+current.mqtt);
+      if(current.on&&lastObserved.on)current.on.forEach((on,i)=>{if(typeof on==='boolean'&&on!==lastObserved.on[i])logEvent('Channel '+(i+1)+' confirmed state: '+(on?'ON':'OFF'));});
+    }else if(current.available)logEvent('Device state observation started');
     lastObserved=current;
   }
   function startEvents(){
@@ -51,19 +51,20 @@
     if(snapshot?.state!==5){if(events)events.close();events=null;eventConnected=false;relaySnapshot=null;return;}
     if(events||typeof EventSource==='undefined')return;
     events=new EventSource('/api/events');
-    events.onopen=()=>{eventConnected=true;logEvent('실시간 상태 연결됨','Live state stream connected');};events.onerror=()=>{if(eventConnected)logEvent('실시간 연결 끊김 · 재연결 대기','Live stream interrupted; waiting for reconnect');eventConnected=false;relaySnapshot=null;};
+    events.onopen=()=>{eventConnected=true;logEvent('Live state stream connected');};events.onerror=()=>{if(eventConnected)logEvent('Live stream interrupted; waiting for reconnect');eventConnected=false;relaySnapshot=null;};
     events.addEventListener('relay',event=>{try{const d=JSON.parse(event.data);if(![d.known,d.on,d.fault].every(Number.isInteger)||d.known<0||d.known>15||d.on<0||d.on>15||d.fault<0)throw Error('Relay');relaySnapshot=d;applyRelay();render();}catch(_){eventConnected=false;}});
     events.addEventListener('device',event=>{try{const d=JSON.parse(event.data);if(!Array.isArray(d.channels)||d.channels.length!==4)throw Error('Device');deviceSnapshot=d;applyRelay();render();}catch(_){eventConnected=false;}});
   }
-  try{preferences=JSON.parse(localStorage.getItem(key)||'{}');if(preferences.language==='ko')language='ko';}catch(_){preferences={};}
-  const t=(name,args={})=>MttlI18n.text(language,name,args);
-  function save(){preferences.language=language;try{localStorage.setItem(key,JSON.stringify(preferences));}catch(_){}}
+  try{preferences=JSON.parse(localStorage.getItem(key)||'{}');}catch(_){preferences={};}
+  const t=(name,args={})=>MttlI18n.text(name,args);
+  function save(){try{localStorage.setItem(key,JSON.stringify(preferences));}catch(_){}}
   function goodName(v){return typeof v==='string'&&v.trim()&&new TextEncoder().encode(v.trim()).length<=64&&!/[\x00-\x1f\x7f]/.test(v);}
-  function name(i){const actual=i<0?deviceSnapshot?.name:deviceSnapshot?.channels?.[i]?.name;const value=actual||(i<0?preferences.deviceName:preferences.channelNames?.[i]);return goodName(value)?value:t(i<0?'deviceDefault':i===0?'channelOneDefault':'channelDefault',{number:i+1});}
+  function name(i){const actual=i<0?deviceSnapshot?.name:deviceSnapshot?.channels?.[i]?.name;const value=actual||(i<0?preferences.deviceName:preferences.channelNames?.[i]);return goodName(value)?value:(i<0?t('deviceDefault'):i?t('channelDefault',{number:i+1}):t('channelOneDefault'));}
   function reading(value,scale,unit){return Number.isInteger(value)?(value/scale).toFixed(scale===10?1:3)+' '+unit:'— '+unit;}
   function settingsBody(c,password=''){
     const port=Number(c.port);if(!Number.isInteger(port)||port<1||port>65535)throw Error('Port');
     const fields=[c.device,...c.channels,'','',c.broker,c.user,password,c.topic];if(fields.length!==11)throw Error('Channels');
+    // The UI is English-only; echo the stored language byte unchanged.
     const bytes=[7,c.language,c.enabled?1:0,port&255,port>>>8];const limits=[64,64,64,64,64,32,64,253,64,64,64];
     fields.forEach((field,i)=>{const data=new TextEncoder().encode(field||'');if(data.length>limits[i])throw Error('Length');bytes.push(data.length,...data);});
     const p=c.protection||{enabled:7,temperature:90,current:16000,power:3000};
@@ -85,7 +86,7 @@ async function storeConfiguration(c,password='',keep=true){if(![2,5].includes(sn
     timerEditor.ready();
     observe();
     el('protection-apply').disabled=!configuration||![2,5].includes(snapshot?.state)||protectionSaving;
-    {const p=deviceSnapshot?.protection,names=language==='en'?['Temperature','Current','Power']:['온도','전류','전력'];const items=bits=>names.filter((_,i)=>bits&(1<<i)).join(', ');el('protection-state').textContent=p?((language==='en'?'Last trip: ':'최근 차단: ')+(p.reason?items(p.reason):(language==='en'?'None':'없음'))+' · '+(language==='en'?'Sensor errors: ':'센서 오류: ')+(p.error?items(p.error):(language==='en'?'None':'없음'))):t('apiUnavailable');}
+    {const p=deviceSnapshot?.protection,items=bits=>bits?['Temperature','Current','Power'].filter((_,i)=>bits&(1<<i)).join(', '):'None';el('protection-state').textContent=p?'Last trip: '+items(p.reason)+' · Sensor errors: '+items(p.error):t('apiUnavailable');}
     ['all-on','all-off'].forEach(id=>el(id).disabled=controlBusy||!deviceSnapshot?.hardware_ready||!snapshot?.hardware_ready||snapshot?.state!==5);
     el('device-name').textContent=name(-1);
     for(let i=0;i<4;i++){
@@ -95,62 +96,50 @@ async function storeConfiguration(c,password='',keep=true){if(![2,5].includes(sn
       const title=document.createElement('h2');title.textContent=name(i);
       const pencil=document.createElement('button');pencil.className='edit-name';pencil.textContent='✎';pencil.setAttribute('aria-label',t('editChannel',{number:i+1}));pencil.onclick=()=>edit(i);header.append(pencil,title);card.append(header);
       const sensors=[];
-      for(const [label,unit,field,scale] of [['power','W','power_mw',1000],['channelMeter','kWh','meter_wh',1000],['current','A','current_ma',1000],['temperature','°C','temp_dc',10]]){
-        const row=document.createElement('div');row.className='sensor';const text=document.createElement('span'),value=document.createElement('b');text.textContent=t(label);value.textContent=reading(deviceSnapshot?.channels?.[i]?.[field],scale,unit);row.append(text,value);card.append(row);
+      for(const [label,unit,field,scale] of [['Power','W','power_mw',1000],['Meter','kWh','meter_wh',1000],['Current','A','current_ma',1000],['Temp','°C','temp_dc',10]]){
+        const row=document.createElement('div');row.className='sensor';const text=document.createElement('span'),value=document.createElement('b');text.textContent=label;value.textContent=reading(deviceSnapshot?.channels?.[i]?.[field],scale,unit);row.append(text,value);card.append(row);
         sensors.push({text,value,label,unit,field,scale});
       }
       const timerRow=document.createElement('div');timerRow.className='sensor';const timerLabel=document.createElement('span'),timer=document.createElement('b');timerRow.setAttribute('aria-live','off');timerRow.append(timerLabel,timer);card.append(timerRow);
-      const button=document.createElement('button');button.className='switch';button.onclick=()=>{const on=optimistic.has(i)?optimistic.get(i):deviceSnapshot?.channels?.[i]?.on;if(on==null&&!confirm(language==='en'?'Outlet state is unverified. Sending ON may change power to connected equipment. Continue?':'콘센트 상태를 확인할 수 없습니다. 켜기 명령이 연결된 기기의 전원을 바꿀 수 있습니다. 계속할까요?'))return;return control(i,on===true?0:1);};card.append(button);el('channels').append(card);
+      const button=document.createElement('button');button.className='switch';button.onclick=()=>{const on=optimistic.has(i)?optimistic.get(i):deviceSnapshot?.channels?.[i]?.on;if(on==null&&!confirm('Outlet state is unverified. Sending ON may change power to connected equipment. Continue?'))return;return control(i,on===true?0:1);};card.append(button);el('channels').append(card);
       const lock=document.createElement('button');lock.className='edit-name channel-lock';lock.onclick=()=>toggleLock(i);header.append(lock);
       channelNodes[i]={title,pencil,button,sensors,lock,timer,timerLabel};
       }
       const node=channelNodes[i];node.title.textContent=name(i);node.pencil.setAttribute('aria-label',t('editChannel',{number:i+1}));
-      const locked=!!((configuration?.button_lock||0)&(1<<i));node.lock.textContent=locked?'🔒':'🔓';node.lock.title=language==='en'?(locked?'Locked: physical button disabled':'Unlocked: physical button enabled'):(locked?'잠김: 물리 버튼 비활성화':'잠금 해제: 물리 버튼 사용');node.lock.setAttribute('aria-label',node.lock.title);node.lock.setAttribute('aria-pressed',String(locked));node.lock.disabled=lockPending.has(i)||!configuration||![2,5].includes(snapshot?.state);
-      for(const sensor of node.sensors){sensor.text.textContent=t(sensor.label);const value=reading(deviceSnapshot?.channels?.[i]?.[sensor.field],sensor.scale,sensor.unit);if(sensor.value.textContent!==value)sensor.value.textContent=value;}
+      const locked=!!((configuration?.button_lock||0)&(1<<i));node.lock.textContent=locked?'🔒':'🔓';node.lock.title=locked?'Locked: physical button disabled':'Unlocked: physical button enabled';node.lock.setAttribute('aria-label',node.lock.title);node.lock.setAttribute('aria-pressed',String(locked));node.lock.disabled=lockPending.has(i)||!configuration||![2,5].includes(snapshot?.state);
+      for(const sensor of node.sensors){const value=reading(deviceSnapshot?.channels?.[i]?.[sensor.field],sensor.scale,sensor.unit);if(sensor.value.textContent!==value)sensor.value.textContent=value;}
       node.button.disabled=pendingChannels.has(i)||pendingChannels.has(4)||!deviceSnapshot?.hardware_ready||!snapshot?.hardware_ready||snapshot?.state!==5;
-      const on=optimistic.has(i)?optimistic.get(i):deviceSnapshot?.channels?.[i]?.on,value=on===true?'ON':on===false?'OFF':(language==='en'?'Unknown · Turn on':'상태 미확인 · 켜기');if(node.button.textContent!==value)node.button.textContent=value;
+      const on=optimistic.has(i)?optimistic.get(i):deviceSnapshot?.channels?.[i]?.on,value=on===true?'ON':on===false?'OFF':'Unknown · Turn on';if(node.button.textContent!==value)node.button.textContent=value;
       const style=on===true?'switch is-on':'switch';if(node.button.className!==style)node.button.className=style;
     }
     drawTimers();
     const states=Array.from({length:4},(_,i)=>optimistic.has(i)?optimistic.get(i):deviceSnapshot?.channels?.[i]?.on);
     const all=snapshot?.state===5&&states.every(on=>typeof on==='boolean')?(states.every(Boolean)?'ON':states.some(Boolean)?'PARTIAL':'OFF'):'—';
     const values=[reading(deviceSnapshot?.power_mw,1000,'W'),reading(deviceSnapshot?.meter_wh,1000,'kWh'),reading(deviceSnapshot?.voltage_dv,10,'V'),reading(deviceSnapshot?.current_ma,1000,'A'),all];document.querySelectorAll('.summary b').forEach((node,i)=>node.textContent=values[i]);
-    const date=value=>Number.isSafeInteger(value)&&value>0?new Date(value).toLocaleString(language==='ko'?'ko-KR':'en-US'):'—';
+    const date=value=>Number.isSafeInteger(value)&&value>0?new Date(value).toLocaleString('en-US'):'—';
     el('mac').textContent=/^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$/i.test(snapshot?.mac||'')?snapshot.mac:'—';el('clock').textContent=date(snapshot?.unix_ms);el('connected').textContent=date(snapshot?.connected_unix_ms);
     el('online').textContent=snapshot?t('netState'+snapshot.state):t('apiUnavailable');
     const ip=snapshot?.ip;el('ip').textContent=Number.isInteger(ip)&&ip>0?[ip>>>24,(ip>>>16)&255,(ip>>>8)&255,ip&255].join('.'):'—';
     el('connected-ssid').textContent=snapshot?hexText(snapshot.ssid_hex)||'—':'—';
     el('rssi').textContent=(snapshot&&Number.isInteger(snapshot.rssi)?snapshot.rssi:'—')+' dBm';
     const storage=el('storage-status');
-    const st=snapshot?.storage,ko=language==='ko';
-    if(!Array.isArray(st)||st.length!==4){storage.textContent=ko?'저장 상태: —':'Storage: —';}
+    const st=snapshot?.storage;
+    if(!Array.isArray(st)||st.length!==4){storage.textContent='Storage: —';}
     else {
-      const saved=st[1]?(st[0]?date(st[0]*1000):(ko?'저장됨 · 시각 미동기화':'Saved · time not synchronized')):(ko?'이번 부팅 후 저장 기록 없음':'No writes since boot');
-      const state=st[3]?(ko?'최근 저장 시도 실패':'Last save attempt failed'):(st[1]?(ko?'정상':'OK'):(ko?'대기':'Waiting'));
-      storage.textContent=(ko?'마지막 플래시 저장: ':'Last flash save: ')+saved+' · '+(ko?'저장 상태: ':'Status: ')+state+' · '+(ko?'이번 부팅 후 실패: ':'Failures since boot: ')+st[2];
+      const saved=st[1]?(st[0]?date(st[0]*1000):'Saved · time not synchronized'):'No writes since boot';
+      const state=st[3]?'Last save attempt failed':(st[1]?'OK':'Waiting');
+      storage.textContent='Last flash save: '+saved+' · Status: '+state+' · Failures since boot: '+st[2];
     }
     {const s=Math.floor((snapshot?.uptime_ms||0)/1000);el('uptime').textContent=snapshot?t('duration',{days:Math.floor(s/86400),hours:Math.floor(s/3600)%24,minutes:Math.floor(s/60)%60,seconds:s%60}):'—';}
-    el('wifi-status').textContent=t(wifiMessage||('netState'+(snapshot?.state??0)));
+    el('wifi-status').textContent=wifiMessage||t('netState'+(snapshot?.state??0));
     el('mqtt-status').textContent=t('netState'+([0,1,3,3,3,5,6][deviceSnapshot?.mqtt_state]??0));
   }
-  function translate(){
-    scheduleEditor.translate();
-    timerEditor.translate();
-    document.documentElement.lang=language;el('language').textContent=language==='ko'?'English':'Korean';
-    document.title='MTTL-W01';for(let i=1;i<=4;i++)el('channel-name-label-'+i).textContent=t('channelName',{number:i});
-    for(const [attr,target] of [['data-i18n',null],['data-i18n-placeholder','placeholder'],['data-i18n-aria','aria-label']])document.querySelectorAll('['+attr+']').forEach(n=>target?n.setAttribute(target,t(n.getAttribute(attr))):n.textContent=t(n.getAttribute(attr)));
-    el('scan').textContent=t('realScan');document.querySelector('#wifi-form button.primary').textContent=t('realConnect');
-    el('current-firmware-version').textContent='2.1.1';el('firmware-status').textContent=t('integrationPending');el('mqtt-status').textContent=t('integrationPending');el('firmware-selected').textContent=t('noSelectedFile');
-    document.querySelector('#mqtt-form button.primary').textContent=language==='en'?'Save to device':'기기에 저장';
-    renderLog();render();
-  }
-  el('language').onclick=()=>{language=language==='ko'?'en':'ko';save();translate();};
   let initialTabPending=true;
   function selectTab(id){document.querySelectorAll('section').forEach(s=>s.classList.toggle('active',s.id===id));document.querySelectorAll('[role=tab]').forEach(b=>b.setAttribute('aria-selected',String(b.getAttribute('aria-controls')===id)));}
   document.querySelectorAll('[role=tab]').forEach(button=>button.onclick=()=>{initialTabPending=false;selectTab(button.getAttribute('aria-controls'));});
   el('edit-names').onclick=()=>edit();el('cancel-names').onclick=()=>{el('name-editor').hidden=true;};
   el('name-form').oncompositionstart=()=>{composing=true;};el('name-form').oncompositionend=()=>{composing=false;};
-  el('name-form').onsubmit=async event=>{event.preventDefault();if(composing)return;const device=el('device-name-input').value,channels=Array.from({length:4},(_,i)=>el('channel-name-'+(i+1)).value);if(![device,...channels].every(goodName)){el('name-status').textContent=t('nameInvalid');return;}if(configuration){try{await storeConfiguration({...configuration,device:device.trim(),channels:channels.map(x=>x.trim()),language:language==='en'?1:0});el('name-status').textContent=language==='en'?'Saved in device flash':'기기 플래시에 저장했습니다.';}catch(_){el('name-status').textContent=language==='en'?'Device save failed':'기기에 저장하지 못했습니다.';return;}}else el('name-status').textContent=t('browserNames');preferences.deviceName=device.trim();preferences.channelNames=channels.map(x=>x.trim());save();render();};
+  el('name-form').onsubmit=async event=>{event.preventDefault();if(composing)return;const device=el('device-name-input').value,channels=Array.from({length:4},(_,i)=>el('channel-name-'+(i+1)).value);if(![device,...channels].every(goodName)){el('name-status').textContent=t('nameInvalid');return;}if(configuration){try{await storeConfiguration({...configuration,device:device.trim(),channels:channels.map(x=>x.trim())});el('name-status').textContent='Saved in device flash';}catch(_){el('name-status').textContent='Device save failed';return;}}else el('name-status').textContent=t('browserNames');preferences.deviceName=device.trim();preferences.channelNames=channels.map(x=>x.trim());save();render();};
   ['all-on','all-off','firmware-picker','firmware-verify','firmware-update'].forEach(id=>el(id).disabled=true);
   async function control(channel,on){
     if(pendingChannels.has(channel)||pendingChannels.has(4)||(channel===4&&pendingChannels.size))return;
@@ -168,37 +157,37 @@ async function storeConfiguration(c,password='',keep=true){if(![2,5].includes(sn
         await new Promise(resolve=>setTimeout(resolve,eventConnected?100:200));
       }
       throw Error('Command not confirmed');
-    }catch(_){try{const actual=await request('/api/device');if(Array.isArray(actual.channels)&&actual.channels.length===4)deviceSnapshot=actual;}catch(_){}logEvent('제어 실패 · 마지막 확인 상태 표시','Control failed; showing last confirmed state');}finally{for(let i=0;i<4;i++)if(channel===4||i===channel)optimistic.delete(i);pendingChannels.delete(channel);controlBusy=pendingChannels.size>0;release();render();}
+    }catch(_){try{const actual=await request('/api/device');if(Array.isArray(actual.channels)&&actual.channels.length===4)deviceSnapshot=actual;}catch(_){}logEvent('Control failed; showing last confirmed state');}finally{for(let i=0;i<4;i++)if(channel===4||i===channel)optimistic.delete(i);pendingChannels.delete(channel);controlBusy=pendingChannels.size>0;release();render();}
   }
   el('all-on').onclick=()=>control(4,1);el('all-off').onclick=()=>control(4,0);
   let protectionSaving=false;
-  const scheduleEditor=MttlSchedule.mount({language:()=>language,available:()=>!!configuration&&[2,5].includes(snapshot?.state),timers:()=>configuration?.timer_minutes||[0,0,0,0],save:async hex=>{const fresh=await request('/api/config');MttlTimer.valid(fresh.timer_minutes||[0,0,0,0],MttlSchedule.decode(hex));await storeConfiguration({...fresh,schedule_hex:hex});timerEditor.load(configuration.timer_minutes);}});
-const timerEditor=MttlTimer.mount({language:()=>language,available:()=>!!configuration&&[2,5].includes(snapshot?.state),schedule:()=>MttlSchedule.decode(configuration?.schedule_hex||MttlSchedule.encode(MttlSchedule.defaults())),save:async minutes=>{const fresh=await request('/api/config');MttlTimer.valid(minutes,MttlSchedule.decode(fresh.schedule_hex||MttlSchedule.encode(MttlSchedule.defaults())));await storeConfiguration({...fresh,timer_minutes:minutes});scheduleEditor.translate();drawTimers();}});
+  const scheduleEditor=MttlSchedule.mount({available:()=>!!configuration&&[2,5].includes(snapshot?.state),timers:()=>configuration?.timer_minutes||[0,0,0,0],save:async hex=>{const fresh=await request('/api/config');MttlTimer.valid(fresh.timer_minutes||[0,0,0,0],MttlSchedule.decode(hex));await storeConfiguration({...fresh,schedule_hex:hex});timerEditor.load(configuration.timer_minutes);}});
+const timerEditor=MttlTimer.mount({available:()=>!!configuration&&[2,5].includes(snapshot?.state),schedule:()=>MttlSchedule.decode(configuration?.schedule_hex||MttlSchedule.encode(MttlSchedule.defaults())),save:async minutes=>{const fresh=await request('/api/config');MttlTimer.valid(minutes,MttlSchedule.decode(fresh.schedule_hex||MttlSchedule.encode(MttlSchedule.defaults())));await storeConfiguration({...fresh,timer_minutes:minutes});scheduleEditor.refresh();drawTimers();}});
   setTimeout(timerClock,999);
   ['temperature','current','power'].forEach(k=>el('protect-'+k).oninput=protectionValues);
   el('protection-form').onsubmit=async event=>{event.preventDefault();if(!configuration||protectionSaving)return;
     const p={enabled:0,temperature:Number(el('protect-temperature').value),current:Math.round(Number(el('protect-current').value)*1000),power:Number(el('protect-power').value)};
     ['temperature','current','power'].forEach((k,i)=>{if(el('protect-'+k+'-enabled').checked)p.enabled|=1<<i;});protectionSaving=true;render();
-    try{await storeConfiguration({...configuration,protection:p});el('protection-save-status').textContent=language==='en'?'Saved in device flash':'기기 플래시에 저장했습니다.';}catch(_){el('protection-save-status').textContent=language==='en'?'Save failed; settings not confirmed':'저장 실패 · 적용 여부를 확인하지 못했습니다.';}finally{protectionSaving=false;render();}
+    try{await storeConfiguration({...configuration,protection:p});el('protection-save-status').textContent='Saved in device flash';}catch(_){el('protection-save-status').textContent='Save failed; settings not confirmed';}finally{protectionSaving=false;render();}
   };
   document.querySelectorAll('#mqtt-form input,#mqtt-form button').forEach(node=>node.disabled=true);
   el('firmware-form').onsubmit=event=>event.preventDefault();
-  el('mqtt-form').onsubmit=async event=>{event.preventDefault();if(!configuration)return;const password=el('mqtt-password').value;el('mqtt-password').value='';try{await storeConfiguration({...configuration,broker:el('broker').value,port:Number(el('port').value),user:el('user').value,enabled:!!el('enabled').checked},password,!password);el('mqtt-status').textContent=language==='en'?'Saved in flash; plaintext IPv4 broker only':'플래시에 저장됨 · IPv4 비암호화 브로커 전용';}catch(_){el('mqtt-status').textContent=t('apiUnavailable');}};
+  el('mqtt-form').onsubmit=async event=>{event.preventDefault();if(!configuration)return;const password=el('mqtt-password').value;el('mqtt-password').value='';try{await storeConfiguration({...configuration,broker:el('broker').value,port:Number(el('port').value),user:el('user').value,enabled:!!el('enabled').checked},password,!password);el('mqtt-status').textContent='Saved in flash; plaintext IPv4 broker only';}catch(_){el('mqtt-status').textContent=t('apiUnavailable');}};
   el('scan').onclick=async()=>{
-    el('scan').disabled=true;wifiMessage='scanProgress';render();
+    el('scan').disabled=true;wifiMessage=t('scanProgress');render();
     try{await request('/api/scan',{method:'POST'});let result;
       for(let n=0;n<12;n++){await new Promise(resolve=>setTimeout(resolve,500));result=await request('/api/scan');if(!result.pending)break;}
-      if(result.pending){wifiMessage='scanTimeout';return;}
-      if(result.failed){wifiMessage='scanFailed';return;}
+      if(result.pending){wifiMessage=t('scanTimeout');return;}
+      if(result.failed){wifiMessage=t('scanFailed');return;}
       if(!Array.isArray(result.networks)||result.networks.length>16)throw Error('Scan');
-      el('ssid').replaceChildren();for(const ap of result.networks){const ssid=hexText(ap.ssid_hex);if(!ssid)continue;const option=document.createElement('option');option.value=ssid;option.textContent=ssid+' ('+ap.rssi+' dBm)';el('ssid').append(option);}wifiMessage='scanDone';
-    }catch(_){wifiMessage='apiUnavailable';}finally{el('scan').disabled=false;render();}
+      el('ssid').replaceChildren();for(const ap of result.networks){const ssid=hexText(ap.ssid_hex);if(!ssid)continue;const option=document.createElement('option');option.value=ssid;option.textContent=ssid+' ('+ap.rssi+' dBm)';el('ssid').append(option);}wifiMessage=t('scanDone');
+    }catch(_){wifiMessage=t('apiUnavailable');}finally{el('scan').disabled=false;render();}
   };
-  el('wifi-form').onsubmit=async event=>{event.preventDefault();const ssid=el('ssid').value,password=el('wifi-password').value;el('wifi-password').value='';if(!ssid||new TextEncoder().encode(ssid).length>32){wifiMessage='ssidInvalid';render();return;}
-    try{await request('/api/wifi',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({ssid,password}).toString()});wifiMessage='connectAccepted';}catch(_){wifiMessage='apiUnavailable';}render();
+  el('wifi-form').onsubmit=async event=>{event.preventDefault();const ssid=el('ssid').value,password=el('wifi-password').value;el('wifi-password').value='';if(!ssid||new TextEncoder().encode(ssid).length>32){wifiMessage=t('ssidInvalid');render();return;}
+    try{await request('/api/wifi',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({ssid,password}).toString()});wifiMessage=t('connectAccepted');}catch(_){wifiMessage=t('apiUnavailable');}render();
   };
   async function poll(){try{const result=await request('/api/status');if(!Number.isInteger(result.state)||result.state<0||result.state>6||!Number.isInteger(result.uptime_ms))throw Error('State');snapshot=result;statusAt=Date.now();}catch(_){snapshot=null;if(!controlBusy)deviceSnapshot=null;}if(snapshot){startEvents();if(!controlBusy&&!eventConnected){try{const d=await request('/api/device');if(!Array.isArray(d.channels)||d.channels.length!==4)throw Error('Device');if(!controlBusy&&!eventConnected)deviceSnapshot=d;}catch(_){if(!controlBusy)deviceSnapshot=null;}}if(!configuration){try{const c=await request('/api/config');if(!Array.isArray(c.channels)||c.channels.length!==4||typeof c.broker!=='string')throw Error('Config');configuration=c;el('broker').value=c.broker;el('port').value=c.port;el('user').value=c.user;el('enabled').checked=c.enabled;loadProtection();timerEditor.load(c.timer_minutes);scheduleEditor.load(c.schedule_hex||MttlSchedule.encode(MttlSchedule.defaults()));}catch(_){configuration=null;}}}document.querySelectorAll('#mqtt-form input,#mqtt-form button').forEach(node=>node.disabled=!configuration||![2,5].includes(snapshot?.state));render();setTimeout(poll,eventConnected?20000:1000);}
-  selectTab('wifi');translate();
+  selectTab('wifi');renderLog();render();
   const initialPoll=poll;
   poll=async function(){await initialPoll();if(initialTabPending&&snapshot){selectTab(typeof location!=='undefined'&&location.hash==='#firmware'?'firmware':snapshot.state===5?'device':'wifi');initialTabPending=false;}};
   poll();

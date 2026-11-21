@@ -4,7 +4,7 @@
  let notice;
  function message(){
   if(!notice){notice=document.createElement('p');notice.setAttribute('role','status');notice.style.cssText='margin:16px;color:#b45309';document.body.appendChild(notice);}
-  notice.textContent=document.documentElement.lang==='en'?'Loading dashboard. Retrying connection…':'화면을 불러오는 중입니다. 연결을 재시도합니다…';
+  notice.textContent='Loading dashboard. Retrying connection…';
  }
  function load(path,next){
   const script=document.createElement('script');script.src=path;script.async=false;

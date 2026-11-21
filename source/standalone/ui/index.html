@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MTTL-W01 · Local control</title>
 <style>
-  :root{color-scheme:light dark;font:15px/1.5 system-ui,-apple-system,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;--bg:#f3f5f7;--card:#fff;--soft:#eef2f5;--fg:#15212b;--muted:#566673;--line:#d9e1e7;--accent:#0a7c67;--on:#fff;--err:#b42318;--ok:#067647;color:var(--fg);background:var(--bg);accent-color:var(--accent)}
+  :root{color-scheme:light dark;font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;--bg:#f3f5f7;--card:#fff;--soft:#eef2f5;--fg:#15212b;--muted:#566673;--line:#d9e1e7;--accent:#0a7c67;--on:#fff;--err:#b42318;--ok:#067647;color:var(--fg);background:var(--bg);accent-color:var(--accent)}
   @media(prefers-color-scheme:dark){:root{--bg:#0d1820;--card:#14232e;--soft:#0f1c26;--fg:#e9f1f5;--muted:#a0b3be;--line:#2b404e;--accent:#38d4b2;--on:#052b24;--err:#ff8f85;--ok:#62e0c0}}
   *{box-sizing:border-box}body{margin:0;min-height:100vh}::selection{background:var(--accent);color:var(--on)}
   header{padding:18px max(20px,calc((100% - 1152px)/2));display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid var(--line)}h1{font-size:20px;letter-spacing:-.02em;margin:0}h2{font-size:18px;letter-spacing:-.01em;margin:0 0 18px;text-wrap:balance}
@@ -22,108 +22,108 @@
   form{max-width:520px}label{display:block;margin:16px 0 6px;font-size:13px;font-weight:600}input,select{width:100%;padding:10px 12px;background:var(--soft)}input[type=checkbox]{width:auto;margin-right:8px}input[type=range]{padding:0}
   .row,.file-picker{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:18px}.status{min-height:22px;color:var(--ok);font-size:13px;margin-top:14px}.status.error{color:var(--err)}
   pre{margin:0;padding:16px;border-radius:12px;background:var(--soft);border:1px solid var(--line);font:12px/1.7 ui-monospace,monospace;white-space:pre-wrap;height:300px;overflow:auto}
-  .header-tools,.device-heading,.device-title{display:flex;align-items:center;gap:10px}.device-heading{justify-content:space-between;margin-bottom:14px}.device-title{min-width:0}.device-heading h2{margin:0;font-size:24px;overflow-wrap:anywhere}#language{font-size:13px;padding:6px 12px;min-height:34px}
+  .device-heading,.device-title{display:flex;align-items:center;gap:10px}.device-heading{justify-content:space-between;margin-bottom:14px}.device-title{min-width:0}.device-heading h2{margin:0;font-size:24px;overflow-wrap:anywhere}
   .name-editor{margin:18px 0;padding:16px;background:var(--soft);border:1px solid var(--line);border-radius:12px}.name-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px}.name-grid .wide{grid-column:1/-1}
   .protection-slider input{flex:1;min-width:0;width:auto}.protection-slider b{min-width:80px;text-align:right;white-space:nowrap}.schedule-time{display:flex;align-items:center;width:max-content;border:1px solid var(--line);border-radius:10px;overflow:hidden}.schedule-time input,.schedule-time select{width:auto;border:0;border-radius:0;padding:10px}.schedule-time input{width:65px}
   .hash{display:block;margin-bottom:12px;font:12px/1.5 ui-monospace,monospace;word-break:break-all}.firmware-info{margin-top:18px;padding:4px 16px;background:var(--soft);border-radius:12px}progress{width:100%;margin-top:14px}
-  [data-i18n="connection"]::after,[data-i18n="currentTime"]::after,[data-i18n="recentConnection"]::after,[data-i18n="uptime"]::after{content:":\00a0"}.channel-lock{font-size:16px;line-height:18px}
+  .channel-lock{font-size:16px;line-height:18px}
   #timer-form{max-width:none}#timer-editor{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}#timer-editor>p,#timer-editor>button{grid-column:1/-1}#timer-editor>.name-editor{min-width:0;margin:0}#timer-editor .row{gap:8px;margin-top:8px}#timer-editor .row label{flex:1;min-width:0;text-align:center}#timer-editor .row input{width:100%!important;text-align:right}#timer-editor .row button{width:100%}
   #timer-editor>button{justify-self:center;width:auto;min-width:140px}#timer-editor>.name-editor>b{display:block;text-align:center}#log{height:600px}
   @media(max-width:900px){.channels,#timer-editor{grid-template-columns:repeat(2,minmax(0,1fr))}}
   @media(max-width:600px){header{padding:14px 16px}main{padding:0 16px;margin-top:16px}.panel{padding:18px}.channel{padding:14px}.summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.summary b{font-size:18px}.summary div:last-child{grid-column:1/-1}.device-heading h2{font-size:20px}nav{flex-wrap:nowrap;overflow:auto;width:100%}nav button{white-space:nowrap}.channels,#timer-editor{grid-template-columns:1fr}#log{height:420px}}
 </style>
-<header><h1>MTTL-W01</h1><div class="header-tools"><span class="badge" data-i18n="simulation">PC 모의 화면</span><button id="language" type="button">English</button></div></header>
+<header><h1>MTTL-W01</h1><span class="badge">PC simulation</span></header>
 <main>
-  <p class="note" data-i18n="note">버튼과 설정 흐름을 확인하는 화면 초안입니다. 아래 값은 가상 데이터이며 실제 멀티탭·Wi-Fi·MQTT에는 연결하지 않습니다.</p>
-  <nav role="tablist" aria-label="메뉴" data-i18n-aria="menu">
-    <button role="tab" aria-selected="true" aria-controls="device" id="tab-device" data-i18n="device">멀티탭</button>
-    <button role="tab" aria-selected="false" aria-controls="wifi" id="tab-wifi" data-i18n="wifi">Wi-Fi 설정</button>
-    <button role="tab" aria-selected="false" aria-controls="mqtt" id="tab-mqtt" data-i18n="mqtt">HA · MQTT</button>
-    <button role="tab" aria-selected="false" aria-controls="protection" id="tab-protection" data-i18n="protection">보호 설정</button>
-    <button role="tab" aria-selected="false" aria-controls="scheduler" id="tab-scheduler" data-i18n="scheduler">스케줄러</button>
-    <button role="tab" aria-selected="false" aria-controls="timer" id="tab-timer" data-i18n="timer">타이머</button>
-    <button role="tab" aria-selected="false" aria-controls="firmware" id="tab-firmware" data-i18n="firmware">펌웨어</button>
-    <button role="tab" aria-selected="false" aria-controls="logs" id="tab-logs" data-i18n="logs">로그</button>
+  <p class="note">A preview of controls and setup. Values are simulated; this page does not connect to a power strip, Wi-Fi or MQTT.</p>
+  <nav role="tablist" aria-label="Menu">
+    <button role="tab" aria-selected="true" aria-controls="device" id="tab-device">Power strip</button>
+    <button role="tab" aria-selected="false" aria-controls="wifi" id="tab-wifi">Wi-Fi setup</button>
+    <button role="tab" aria-selected="false" aria-controls="mqtt" id="tab-mqtt">HA · MQTT</button>
+    <button role="tab" aria-selected="false" aria-controls="protection" id="tab-protection">Protection</button>
+    <button role="tab" aria-selected="false" aria-controls="scheduler" id="tab-scheduler">Scheduler</button>
+    <button role="tab" aria-selected="false" aria-controls="timer" id="tab-timer">Timer</button>
+    <button role="tab" aria-selected="false" aria-controls="firmware" id="tab-firmware">Firmware</button>
+    <button role="tab" aria-selected="false" aria-controls="logs" id="tab-logs">Logs</button>
   </nav>
   <section id="device" class="active" role="tabpanel" aria-labelledby="tab-device">
     <div class="panel">
-      <div class="device-heading"><div class="device-title"><h2 id="device-name">거실 멀티탭</h2><button id="edit-names" class="edit-name" type="button" data-i18n-aria="rename">✎</button></div></div>
-      <div class="meta"><span>IP:&nbsp;<b id="ip">192.0.2.10</b></span><span>MAC:&nbsp;<b id="mac">02:00:00:00:00:01</b></span><span><span data-i18n="connection">연결</span><b id="online">Online · 모의</b></span><span>SSID:&nbsp;<b id="connected-ssid">SIMULATED_AP</b></span><span>RSSI:&nbsp;<b id="rssi">-43 dBm</b></span></div>
-      <div id="name-editor" class="name-editor" hidden><h2 data-i18n="nameSettings">기기 · 채널 이름</h2><form id="name-form">
-        <div class="name-grid"><div class="wide"><label for="device-name-input" data-i18n="deviceName">기기 이름</label><input id="device-name-input" type="text" maxlength="64" required></div>
-        <div><label id="channel-name-label-1" for="channel-name-1">채널 1 이름</label><input id="channel-name-1" maxlength="64" required></div>
-        <div><label id="channel-name-label-2" for="channel-name-2">채널 2 이름</label><input id="channel-name-2" maxlength="64" required></div>
-        <div><label id="channel-name-label-3" for="channel-name-3">채널 3 이름</label><input id="channel-name-3" maxlength="64" required></div>
-        <div><label id="channel-name-label-4" for="channel-name-4">채널 4 이름</label><input id="channel-name-4" maxlength="64" required></div></div>
-        <p class="muted" data-i18n="nameHint">이름은 저장 버튼을 눌렀을 때 반영됩니다. 각 이름은 UTF-8 64바이트 이내입니다.</p>
-        <div class="row"><button class="primary" data-i18n="saveNames">이름 저장</button><button id="cancel-names" type="button" data-i18n="cancel">취소</button></div>
+      <div class="device-heading"><div class="device-title"><h2 id="device-name">Living room power strip</h2><button id="edit-names" class="edit-name" type="button" aria-label="Edit names">✎</button></div></div>
+      <div class="meta"><span>IP:&nbsp;<b id="ip">192.0.2.10</b></span><span>MAC:&nbsp;<b id="mac">02:00:00:00:00:01</b></span><span>Connection:&nbsp;<b id="online">Online · simulated</b></span><span>SSID:&nbsp;<b id="connected-ssid">SIMULATED_AP</b></span><span>RSSI:&nbsp;<b id="rssi">-43 dBm</b></span></div>
+      <div id="name-editor" class="name-editor" hidden><h2>Device &amp; channel names</h2><form id="name-form">
+        <div class="name-grid"><div class="wide"><label for="device-name-input">Device name</label><input id="device-name-input" type="text" maxlength="64" required></div>
+        <div><label id="channel-name-label-1" for="channel-name-1">Channel 1 name</label><input id="channel-name-1" maxlength="64" required></div>
+        <div><label id="channel-name-label-2" for="channel-name-2">Channel 2 name</label><input id="channel-name-2" maxlength="64" required></div>
+        <div><label id="channel-name-label-3" for="channel-name-3">Channel 3 name</label><input id="channel-name-3" maxlength="64" required></div>
+        <div><label id="channel-name-label-4" for="channel-name-4">Channel 4 name</label><input id="channel-name-4" maxlength="64" required></div></div>
+        <p class="muted">Names are applied when you press Save. Each name may contain up to 64 UTF-8 bytes.</p>
+        <div class="row"><button class="primary">Save names</button><button id="cancel-names" type="button">Cancel</button></div>
         <div id="name-status" class="status" role="status"></div>
       </form></div>
-      <div class="time muted"><span data-i18n="currentTime">현재 시각</span> <span id="clock">—</span> · <span data-i18n="recentConnection">최근 연결</span> <span id="connected">—</span> · <span data-i18n="uptime">가동</span> <span id="uptime">0초</span></div>
+      <div class="time muted">Current time: <span id="clock">—</span> · Last connected: <span id="connected">—</span> · Uptime: <span id="uptime">0s</span></div>
       <p id="storage-status" class="muted" role="status">—</p>
-      <div class="summary"><div><small data-i18n="totalPower">전체 전력</small><b id="total">0.0 W</b></div><div><small data-i18n="meter">누적 전력량</small><b>1.551 kWh</b></div><div><small data-i18n="voltage">전압</small><b>220.0 V</b></div><div><small data-i18n="totalCurrent">전체 전류</small><b id="current">0.000 A</b></div><div><small data-i18n="all">전체</small><b id="all">OFF</b></div></div>
-      <div class="controls"><button id="all-on" data-i18n="allOn">전체 켜기</button> <button id="all-off" data-i18n="allOff">전체 끄기</button></div>
+      <div class="summary"><div><small>Total Power</small><b id="total">0.0 W</b></div><div><small>Meter</small><b>1.551 kWh</b></div><div><small>Voltage</small><b>220.0 V</b></div><div><small>Total Current</small><b id="current">0.000 A</b></div><div><small>ALL</small><b id="all">OFF</b></div></div>
+      <div class="controls"><button id="all-on">All ON</button> <button id="all-off">All OFF</button></div>
     </div>
     <div class="channels" id="channels"></div>
-    <div class="row"><button id="hold" data-i18n="hold">메인 버튼 10초 길게 누르기 모의</button><span class="muted" data-i18n="holdHint">Wi-Fi 설정 모드 흐름 확인</span></div>
+    <div class="row"><button id="hold">Simulate holding the main button for 10 seconds</button><span class="muted">Open Wi-Fi setup mode</span></div>
   </section>
   <section id="wifi" role="tabpanel" aria-labelledby="tab-wifi">
-    <div class="panel"><h2 data-i18n="wifi">Wi-Fi 설정</h2><p class="muted" data-i18n="wifiHint">설정 AP 주소: 192.168.4.1 · Wi-Fi 목록을 검색하고 연결할 네트워크를 선택합니다.</p>
-      <form id="wifi-form"><button type="button" id="scan" data-i18n="scan">Wi-Fi 검색 모의</button><label for="ssid" data-i18n="network">네트워크</label><select id="ssid" required><option value="" data-i18n="scanFirst">검색 후 선택</option></select><label for="wifi-password" data-i18n="password">암호</label><input id="wifi-password" type="password" maxlength="64" autocomplete="off"><div class="row"><button class="primary" data-i18n="connect">연결 모의</button></div><div id="wifi-status" class="status" role="status"></div></form>
+    <div class="panel"><h2>Wi-Fi setup</h2><p class="muted">Setup AP address: 192.168.4.1 · Scan for Wi-Fi networks, then select one to connect.</p>
+      <form id="wifi-form"><button type="button" id="scan">Simulate Wi-Fi scan</button><label for="ssid">Wi-Fi SSID</label><select id="ssid" required><option value="">Scan to select</option></select><label for="wifi-password">Password</label><input id="wifi-password" type="password" maxlength="64" autocomplete="off"><div class="row"><button class="primary">Simulate connection</button></div><div id="wifi-status" class="status" role="status"></div></form>
     </div>
   </section>
   <section id="mqtt" role="tabpanel" aria-labelledby="tab-mqtt">
-    <div class="panel"><h2 data-i18n="mqttTitle">Home Assistant · MQTT</h2><form id="mqtt-form">
-      <label for="broker" data-i18n="broker">Broker</label><input id="broker" placeholder="192.168.0.4" required maxlength="253">
-      <label for="port" data-i18n="port">Port</label><input id="port" type="number" min="1" max="65535" value="1883" required>
-      <label for="user" data-i18n="username">사용자</label><input id="user" maxlength="64" autocomplete="off">
-      <label for="mqtt-password" data-i18n="password">암호</label><input id="mqtt-password" type="password" maxlength="64" autocomplete="off">
-      <label><input id="enabled" type="checkbox"><span data-i18n="mqttEnable">MQTT 연동 활성화</span></label>
-      <div class="row"><button class="primary" data-i18n="saveMock">저장 모의</button></div><div id="mqtt-status" class="status" role="status">Disabled</div>
+    <div class="panel"><h2>Home Assistant · MQTT</h2><form id="mqtt-form">
+      <label for="broker">Broker</label><input id="broker" placeholder="192.168.0.4" required maxlength="253">
+      <label for="port">Port</label><input id="port" type="number" min="1" max="65535" value="1883" required>
+      <label for="user">Username</label><input id="user" maxlength="64" autocomplete="off">
+      <label for="mqtt-password">Password</label><input id="mqtt-password" type="password" maxlength="64" autocomplete="off">
+      <label><input id="enabled" type="checkbox"><span>Enable MQTT integration</span></label>
+      <div class="row"><button class="primary">Simulate saving</button></div><div id="mqtt-status" class="status" role="status">Disabled</div>
     </form></div>
   </section>
   <section id="protection" role="tabpanel" aria-labelledby="tab-protection">
-    <div class="panel"><h2 data-i18n="protection">보호 설정</h2><p class="muted" data-i18n="protectionHint">온도는 첫 초과, 전체 전류·전력은 2회 연속 초과 시 전체 OFF합니다. 측정 주기는 약 10초입니다.</p>
+    <div class="panel"><h2>Protection</h2><p class="muted">All OFF on the first high temperature reading, or two consecutive high total current/power rounds. Each channel is sampled about every 10 seconds.</p>
     <form id="protection-form">
-      <label><input id="protect-temperature-enabled" type="checkbox" checked><span data-i18n="protectTemperature">고온 차단 · 채널 중 최고 온도</span></label>
+      <label><input id="protect-temperature-enabled" type="checkbox" checked><span>Temperature · highest channel</span></label>
       <div class="sensor protection-slider"><input id="protect-temperature" type="range" min="50" max="90" step="1" value="90"><b id="protect-temperature-value">90 °C</b></div>
-      <label><input id="protect-current-enabled" type="checkbox" checked><span data-i18n="protectCurrent">과전류 차단 · 보정 후 전체 전류</span></label>
+      <label><input id="protect-current-enabled" type="checkbox" checked><span>Overcurrent · corrected total current</span></label>
       <div class="sensor protection-slider"><input id="protect-current" type="range" min="1" max="16" step="0.1" value="16"><b id="protect-current-value">16.0 A</b></div>
-      <label><input id="protect-power-enabled" type="checkbox" checked><span data-i18n="protectPower">고전력 차단 · 전체 전력</span></label>
+      <label><input id="protect-power-enabled" type="checkbox" checked><span>Power · total power</span></label>
       <div class="sensor protection-slider"><input id="protect-power" type="range" min="100" max="3000" step="1" value="3000"><b id="protect-power-value">3000 W</b></div>
-      <div class="row"><button id="protection-apply" class="primary" data-i18n="applyProtection" disabled>적용</button></div><div id="protection-save-status" class="status" role="status"></div>
-    </form><div id="protection-state" class="status" role="status"></div><p class="muted" data-i18n="protectionNote">자동 재켜기·잠금은 없습니다. 센서 읽기 실패는 오류만 표시합니다. 하드웨어 안전 보호 장치를 대체하지 않습니다.</p></div>
+      <div class="row"><button id="protection-apply" class="primary" disabled>Apply</button></div><div id="protection-save-status" class="status" role="status"></div>
+    </form><div id="protection-state" class="status" role="status"></div><p class="muted">No automatic ON or lock. Sensor failures show errors only. This does not replace hardware safety protection.</p></div>
   </section>
   <section id="scheduler" role="tabpanel" aria-labelledby="tab-scheduler">
-    <div class="panel"><h2 data-i18n="scheduler">스케줄러</h2><form id="schedule-form"><div id="schedule-editor"></div><div id="schedule-status" class="status" role="status"></div></form></div>
+    <div class="panel"><h2>Scheduler</h2><form id="schedule-form"><div id="schedule-editor"></div><div id="schedule-status" class="status" role="status"></div></form></div>
   </section>
-  <section id="timer" role="tabpanel" aria-labelledby="tab-timer"><div class="panel"><h2 data-i18n="timer">타이머</h2><form id="timer-form"><div id="timer-editor"></div><div id="timer-status" class="status" role="status"></div></form></div></section>
+  <section id="timer" role="tabpanel" aria-labelledby="tab-timer"><div class="panel"><h2>Timer</h2><form id="timer-form"><div id="timer-editor"></div><div id="timer-status" class="status" role="status"></div></form></div></section>
   <section id="firmware" role="tabpanel" aria-labelledby="tab-firmware">
-    <div class="panel"><h2 data-i18n="firmware">펌웨어</h2>
-      <div class="sensor"><span data-i18n="currentVersion">현재 버전</span><b id="current-firmware-version">2.1.1</b></div>
-      <p class="muted" data-i18n="firmwareHint">현재: 독립 펌웨어 화면 초안 · 선택한 파일의 형식과 체크섬을 PC에서 검사합니다.</p>
+    <div class="panel"><h2>Firmware</h2>
+      <div class="sensor"><span>Current version</span><b id="current-firmware-version">2.1.1</b></div>
+      <p class="muted">Current: standalone firmware preview · Inspect the selected file format and checksum on this PC.</p>
       <form id="firmware-form">
-        <label for="firmware-picker" data-i18n="firmwareFile">펌웨어 파일 (.fwr / Image2 .bin)</label><input id="firmware-file" type="file" accept=".fwr,.bin" hidden>
-        <div class="file-picker"><button id="firmware-picker" type="button" data-i18n="chooseFirmwareFile">파일 선택</button><span id="firmware-selected" class="muted" aria-live="polite">선택된 파일 없음</span></div>
-        <label for="firmware-expected" data-i18n="expectedHash">예상 SHA-256 (선택)</label><input id="firmware-expected" data-i18n-placeholder="hashPlaceholder" placeholder="배포자가 제공한 64자리 SHA-256" maxlength="64" autocomplete="off">
-        <div class="row"><button id="firmware-verify" type="button" data-i18n="verifyFile">파일 검사</button><button id="firmware-update" class="primary" data-i18n="updateMock" disabled>업데이트 모의 실행</button></div>
+        <label for="firmware-picker">Firmware file (.fwr / Image2 .bin)</label><input id="firmware-file" type="file" accept=".fwr,.bin" hidden>
+        <div class="file-picker"><button id="firmware-picker" type="button">Choose file</button><span id="firmware-selected" class="muted" aria-live="polite">No file selected</span></div>
+        <label for="firmware-expected">Expected SHA-256 (optional)</label><input id="firmware-expected" placeholder="64-digit SHA-256 provided by the publisher" maxlength="64" autocomplete="off">
+        <div class="row"><button id="firmware-verify" type="button">Inspect file</button><button id="firmware-update" class="primary" disabled>Simulate update</button></div>
       </form>
       <div id="firmware-info" class="firmware-info" hidden>
-        <div class="sensor"><span data-i18n="file">파일</span><b id="firmware-name">—</b></div>
-        <div class="sensor"><span data-i18n="size">크기</span><b id="firmware-size">—</b></div>
-        <div class="sensor"><span data-i18n="format">형식</span><b id="firmware-format">—</b></div>
-        <div class="sensor"><span data-i18n="versionCandidates">본문의 버전 후보</span><b id="firmware-version">—</b></div>
-        <div class="sensor"><span data-i18n="checksum">체크섬</span><b id="firmware-checksum">—</b></div>
-        <div class="sensor"><span>SHA-256</span><button id="firmware-copy" type="button" class="edit-name" data-i18n="copyHash">복사</button></div><b id="firmware-hash" class="hash">—</b>
+        <div class="sensor"><span>File</span><b id="firmware-name">—</b></div>
+        <div class="sensor"><span>Size</span><b id="firmware-size">—</b></div>
+        <div class="sensor"><span>Format</span><b id="firmware-format">—</b></div>
+        <div class="sensor"><span>Version candidates in the image</span><b id="firmware-version">—</b></div>
+        <div class="sensor"><span>Checksum</span><b id="firmware-checksum">—</b></div>
+        <div class="sensor"><span>SHA-256</span><button id="firmware-copy" type="button" class="edit-name">Copy</button></div><b id="firmware-hash" class="hash">—</b>
       </div>
-      <progress id="firmware-progress" value="0" max="100" hidden aria-label="모의 업데이트 진행률" data-i18n-aria="progressLabel"></progress>
-      <div id="firmware-status" class="status" role="status" aria-live="polite">파일을 선택하고 검사해 주세요.</div>
-      <ol class="firmware-steps"><li data-i18n="firmwareStep1">파일 형식·크기·진입점·체크섬 검사</li><li data-i18n="firmwareStep2">업로드 및 재검사 진행 모의</li><li data-i18n="firmwareStep3">재부팅·재연결 진행 모의</li></ol>
-      <p class="muted" data-i18n="otaServerHint">펌웨어는 사용하는 OTA 서버에서만 받고, 업로드 전에 파일의 SHA-256을 서버에 게시된 값과 비교하세요.</p>
-      <p class="muted" data-i18n="firmwareLimit">형식 검사 통과는 실제 부팅 보증이 아닙니다. 이 화면은 파일을 서버나 기기에 전송하지 않으며, 실제 기록·재부팅은 연결되지 않았습니다.</p>
+      <progress id="firmware-progress" value="0" max="100" hidden aria-label="Simulated update progress"></progress>
+      <div id="firmware-status" class="status" role="status" aria-live="polite">Choose a file, then inspect it.</div>
+      <ol class="firmware-steps"><li>Inspect format, size, entry point and checksum</li><li>Simulate upload and verification</li><li>Simulate restart and reconnection</li></ol>
+      <p class="muted">Download firmware only from your OTA server and compare the file SHA-256 with the value it publishes before uploading.</p>
+      <p class="muted">Passing inspection does not guarantee boot compatibility. This page does not transmit the file to a server or device; flash writing and restart are not connected.</p>
     </div>
   </section>
-  <section id="logs" role="tabpanel" aria-labelledby="tab-logs"><div class="panel"><h2 data-i18n="eventLog">이벤트 로그</h2><label><input id="autoscroll" type="checkbox" checked><span data-i18n="autoscroll">자동 스크롤</span></label><pre id="log" aria-label="이벤트 로그" data-i18n-aria="eventLog"></pre></div></section>
+  <section id="logs" role="tabpanel" aria-labelledby="tab-logs"><div class="panel"><h2>Event log</h2><label><input id="autoscroll" type="checkbox" checked><span>Auto-scroll</span></label><pre id="log" aria-label="Event log"></pre></div></section>
 </main>
 <script src="i18n.js"></script>
 <script src="scheduler.js"></script>
