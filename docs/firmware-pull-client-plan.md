@@ -29,7 +29,7 @@ This is not yet a pull client. There is no firmware-side manifest fetch, remote 
 4. **Separate download from activation.** Download and verify into the inactive slot, expose a pending-update status, and require an explicit dashboard confirmation before commit/reboot. A failed connection, hash, signature, or readback must leave the active image unchanged.
 5. **Add transport and failure limits.** Set connection, header, idle, total-duration, redirect, retry, and byte limits. Use bounded backoff only after explicit user enablement. Never retry indefinitely and never update over the setup AP.
 6. **Add observability without secrets.** Report state (`disabled`, `checking`, `downloading`, `verifying`, `pending-confirmation`, `failed`) and a short error code. Do not log URLs containing credentials, tokens, or response bodies.
-7. **Test before hardware.** Add host tests for manifest parsing, signature and hash failures, truncation, oversized content, redirects, timeout/retry bounds, downgrade rejection, interrupted writes, and inactive-slot preservation. Run the existing OTA/self-test suite and static checks. Physical-device validation is a separate approved step.
+7. **Test before hardware.** Add host tests for manifest parsing, signature and hash failures, truncation, oversized content, redirects, timeout/retry bounds, downgrade rejection, interrupted writes, simulated power loss, and inactive-slot preservation. Run the existing OTA/self-test suite and static checks. Physical-device validation is a separate approved step.
 
 ## Approval gates
 
