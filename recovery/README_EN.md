@@ -22,7 +22,7 @@ This is for people capable of verifying power, ground, signal levels and solder 
 - Windows x64, ST Link V2 and SWD. Install the USB driver separately.
 - Only the known Cortex-M3/1MiB flash/boot-code fingerprint and 0xB000/0x80000 slot layout are accepted.
 - Restores stock firmware **1.0.66**.
-- Korean/English GUI, double-backup, diagnosis, image planning, bounded writes, full readback verification and reset are implemented.
+- English GUI, double-backup, diagnosis, image planning, bounded writes, full readback verification and reset are implemented.
 - Offline fault-injection/workflow and frozen EXE checks passed. **Physical write and recovery boot have not been tested with this integrated tool.**
 - Compatibility with all board variants, successful recovery and power-loss safety are not guaranteed.
 
@@ -60,12 +60,11 @@ The upper-right red circle is **VCC_5V**, not the nearby GND2 pad. The user conf
 ## Operation
 
 1. Verify isolation, wiring, power and driver, then run `MTTL-Recovery.exe`. Launching the app alone does not connect to a target.
-2. Choose Korean/English at the top right. Language/mode changes and closing are blocked while a job runs.
-3. Select the safety-confirmation checkbox.
-4. The default is **diagnosis/double-backup only**. Initially use Start in this mode to check the connection and backups.
-5. For restoration, select **Restore stock firmware** and click **Start**. The included stock 1.0.66 firmware is used automatically without a file picker, followed by backup, restoration, verification and reboot.
-6. Do not suspend the PC, disconnect power/USB or force-close the app once writing has begun. Stage/status and detailed logs show progress.
-7. After writing and full readback verification succeed, the tool automatically sends a reboot command. Once the job is complete, disconnect USB power, then disconnect ST Link V2 and all debug wires. With all power disconnected, reconnect the Wi-Fi board to the AC assembly and fully reassemble the strip before connecting mains power. Then hold the main button to enter the stock Wi-Fi setup mode. Successful boot and setup AP operation must be checked separately.
+2. Select the safety-confirmation checkbox.
+3. The default is **diagnosis/double-backup only**. Initially use Start in this mode to check the connection and backups.
+4. For restoration, select **Restore stock firmware** and click **Start**. The included stock 1.0.66 firmware is used automatically without a file picker, followed by backup, restoration, verification and reboot.
+5. Do not suspend the PC, disconnect power/USB or force-close the app once writing has begun. Stage/status and detailed logs show progress.
+6. After writing and full readback verification succeed, the tool automatically sends a reboot command. Once the job is complete, disconnect USB power, then disconnect ST Link V2 and all debug wires. With all power disconnected, reconnect the Wi-Fi board to the AC assembly and fully reassemble the strip before connecting mains power. Then hold the main button to enter the stock Wi-Fi setup mode. Successful boot and setup AP operation must be checked separately.
 
 ## Automatic workflow
 
