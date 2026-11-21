@@ -1,6 +1,6 @@
 # Local HTTP control API
 
-[한국어](HTTP_API.md) | English · [Project](../README_EN.md)
+[Project](../README_EN.md)
 
 This documents the API used by the dashboard in the current public firmware, 2.1.1. Local programs can call it without an MQTT broker. This documentation update does not change firmware behavior.
 

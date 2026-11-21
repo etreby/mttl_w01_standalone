@@ -49,7 +49,7 @@ Before a planned disconnection, choose a channel that can be operated without di
 - SoftAP Wi-Fi setup/scan, LAN Wi-Fi changes and automatic reconnection
 - Individual/all channel control, physical buttons and LEDs
 - Total power/energy/voltage/current and per-channel power/energy/current/temperature
-- Editable device/channel names, Korean/English UI, NTP and browser-session logs
+- Editable device/channel names, English web UI, NTP and browser-session logs
 - HA MQTT Discovery: five switches and twenty sensors
 - SSE updates, optimistic web controls and confirmed logical-state reporting to HA
 - FWR web OTA, persistent settings/energy and enabled watchdog
