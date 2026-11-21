@@ -33,6 +33,14 @@ class CssTests(unittest.TestCase):
         self.assertEqual(minify_css(css, used),
                          '.panel{a:1}.row{c:3}#log{d:4}b{g:7}.switch.is-on{h:8}#protect-power{j:10}:root{m:13}*{n:14}')
 
+    def test_media_query_keeps_and_spacing(self):
+        self.assertEqual(minify_css('@media screen and (max-width: 600px) , print { a { x:1 } }'),
+                         '@media screen and (max-width:600px),print{a{x:1}}')
+
+    def test_quoted_strings_are_unchanged(self):
+        self.assertEqual(minify_css('a{font:12px "Segoe UI, Sans" , serif;content:": #aabbcc";color:#AABBCC}'),
+                         'a{font:12px "Segoe UI, Sans",serif;content:": #aabbcc";color:#ABC}')
+
     def test_no_usage_keeps_everything(self):
         self.assertEqual(minify_css('.gone{b:2}'), '.gone{b:2}')
 

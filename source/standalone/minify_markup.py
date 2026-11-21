@@ -41,8 +41,12 @@ def _alive(selector, used):
 
 
 def _declarations(body):
-    body = re.sub(r'\s*([:;,])\s*', r'\1', body.strip()).rstrip(';')
-    return _HEX.sub(lambda m: '#' + ''.join(g for g in m.groups() if g), body)
+    # Quoted strings (font names, content values) are copied unchanged.
+    parts = re.split(r'("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')', body.strip())
+    for i in range(0, len(parts), 2):
+        parts[i] = _HEX.sub(lambda m: '#' + ''.join(g for g in m.groups() if g),
+                            re.sub(r'\s*([:;,])\s*', r'\1', parts[i]))
+    return ''.join(parts).rstrip(';')
 
 
 def minify_css(css, used=None):
@@ -53,7 +57,10 @@ def minify_css(css, used=None):
         if prelude.startswith('@'):
             inner = minify_css(body, used)
             if inner:
-                out.append(re.sub(r'\s*([(:,)])\s*', r'\1', prelude) + '{' + inner + '}')
+                # Keep the space in 'and (': only the at-keyword may touch '('.
+                prelude = re.sub(r'^(@[\w-]+)\s+\(', r'\1(', prelude)
+                prelude = re.sub(r'\(\s+', '(', re.sub(r'\s+\)', ')', re.sub(r'\s*([:,])\s*', r'\1', prelude)))
+                out.append(prelude + '{' + inner + '}')
             continue
         selectors = [s.strip() for s in prelude.split(',')]
         if used is not None:
