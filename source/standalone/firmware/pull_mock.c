@@ -54,15 +54,15 @@ void mttl_pull_test(void){
  memset(pk,0,32);pk[0]=2;unhex(rfc[0].sig,sig);check(verify_hex(pk,rfc[0].msg,sig)==0);
  unhex(rfc[0].pk,pk);memset(sig,0,64);check(verify_hex(pk,rfc[0].msg,sig)==0);
  /* Base URL: RFC 1918 IPv4 with explicit port only. */
- check(mttl_pull_base_parse("http://10.99.0.10:8080",&ip,&port)&&ip==0x0a63000au&&port==8080);
+ check(mttl_pull_base_parse("http://192.168.0.10:8080",&ip,&port)&&ip==0xc0a8000au&&port==8080);
  check(mttl_pull_base_parse("http://192.168.1.5:80/",&ip,&port)&&mttl_pull_base_parse("http://172.31.255.1:1",&ip,&port));
  check(!mttl_pull_base_parse("https://10.0.0.1:443",&ip,&port)&&!mttl_pull_base_parse("http://8.8.8.8:80",&ip,&port)&&!mttl_pull_base_parse("http://172.32.0.1:80",&ip,&port));
  check(!mttl_pull_base_parse("http://10.0.0.1",&ip,&port)&&!mttl_pull_base_parse("http://10.0.0.1:0",&ip,&port)&&!mttl_pull_base_parse("http://10.0.0.1:65536",&ip,&port));
  check(!mttl_pull_base_parse("http://10.0.0.1:80/x",&ip,&port)&&!mttl_pull_base_parse("http://10.0.0.01:80",&ip,&port)&&!mttl_pull_base_parse("http://user@10.0.0.1:80",&ip,&port)&&!mttl_pull_base_parse("",&ip,&port));
  /* Request: HTTP/1.0 (no chunking), no credentials, bounded. */
- n=mttl_pull_request(req,sizeof(req),0x0a63000au,8080,"/v1/device/manifest");
- check(n&&!strcmp(req,"GET /v1/device/manifest HTTP/1.0\r\nHost: 10.99.0.10:8080\r\nAccept: */*\r\nConnection: close\r\n\r\n"));
- check(!mttl_pull_request(req,40,0x0a63000au,8080,"/v1/device/manifest")&&!mttl_pull_request(req,sizeof(req),1,1,"/a/../b")&&!mttl_pull_request(req,sizeof(req),1,1,"x"));
+ n=mttl_pull_request(req,sizeof(req),0xc0a8000au,8080,"/v1/device/manifest");
+ check(n&&!strcmp(req,"GET /v1/device/manifest HTTP/1.0\r\nHost: 192.168.0.10:8080\r\nAccept: */*\r\nConnection: close\r\n\r\n"));
+ check(!mttl_pull_request(req,40,0xc0a8000au,8080,"/v1/device/manifest")&&!mttl_pull_request(req,sizeof(req),1,1,"/a/../b")&&!mttl_pull_request(req,sizeof(req),1,1,"x"));
  /* Response head: 200 + Content-Length only; redirects are never followed. */
  #define HEAD(s) mttl_pull_response_head((const uint8_t *)s,sizeof(s)-1,&len)
  check(HEAD("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 412\r\n\r\n")==MTTL_PULL_OK&&len==412);

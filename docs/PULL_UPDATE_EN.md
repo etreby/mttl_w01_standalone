@@ -27,7 +27,7 @@ update on its own.
 `http://<IPv4>:<port>` with an optional trailing `/`, nothing else: no host
 names, no credentials, no path, no query. The IPv4 address must be in an
 RFC 1918 range (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`); the port
-is required (1–65535). Example: `http://10.99.0.10:8080`.
+is required (1–65535). Example: `http://192.168.0.10:8080`.
 
 ## Requests made by the device
 
@@ -36,7 +36,7 @@ credentials or cookies, and are sent only after an explicit user action:
 
 ```http
 GET /v1/device/manifest HTTP/1.0
-Host: 10.99.0.10:8080
+Host: 192.168.0.10:8080
 Accept: */*
 Connection: close
 ```
