@@ -10,9 +10,6 @@ int mttl_sdk_worker_start(void); /* Started by opt-in test setup; offline defaul
 void mttl_sdk_watchdog_tick(void);
 void mttl_sdk_watchdog_http(int active);
 int mttl_sdk_settings_persistent(void);
-int mttl_sdk_pin_required(void);
-/* 1 allowed, 0 missing/wrong PIN, -1 locked out after repeated wrong PINs. */
-int mttl_sdk_pin_check(const char *given);
 /* HTTP task requests owner-task checkpoint and waits; held until release. */
 int mttl_sdk_energy_barrier(void);
 void mttl_sdk_energy_release(void);
@@ -23,8 +20,7 @@ int mttl_sdk_scan_queued(void);
 int mttl_sdk_scan_failed(void);
 void mttl_sdk_status_snapshot(mttl_worker_status *status);
 size_t mttl_sdk_device_json(char *,size_t,int settings);
-/* pin: NULL keeps the stored PIN, "" clears it, 4..12 digits set it. */
-int mttl_sdk_config_reserve(const uint8_t *,size_t,int keep_password,const char *pin);
+int mttl_sdk_config_reserve(const uint8_t *,size_t,int keep_password);
 void mttl_sdk_config_release(int accepted);
 int mttl_sdk_control_request(unsigned channel,unsigned on);
 void mttl_sdk_control_timing(uint32_t out[4]);

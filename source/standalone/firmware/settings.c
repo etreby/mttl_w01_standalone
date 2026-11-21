@@ -1,5 +1,4 @@
 #include "settings.h"
-#include "pin.h"
 #include <string.h>
 int mttl_settings_mqtt_changed(const mttl_settings *a,const mttl_settings *b){
     return a->port!=b->port||a->mqtt_enabled!=b->mqtt_enabled||
@@ -52,7 +51,6 @@ int mttl_settings_valid(const mttl_settings *s){
     for(i=0;i<k;i++){unsigned char c=(unsigned char)s->wifi_password[i];if(c<32||c>126)return 0;
         if(k==64&&!((c>='0'&&c<='9')||(c>='a'&&c<='f')||(c>='A'&&c<='F')))return 0;}
     if(!ascii(s->broker,254,1)||!ascii(s->topic,65,0)||!utf8(s->mqtt_user,65,0)||!utf8(s->mqtt_password,65,0))return 0;
-    if(s->pin[0]&&!mttl_pin_valid(s->pin))return 0;
     return !s->mqtt_enabled||(s->broker[0]&&s->topic[0]);
 }
 static int field(uint8_t *out,size_t cap,size_t *used,const char *s,size_t bound){
@@ -92,35 +90,24 @@ done:for(i=0;i<sizeof(tmp);i++)wipe[i]=0;return result;
 void mttl_settings_keep_energy(mttl_settings *to,const mttl_settings *from){
     unsigned i;for(i=0;i<4;i++){to->energy_raw[i]=from->energy_raw[i];to->energy_wh[i]=from->energy_wh[i];}to->energy_valid=from->energy_valid;
     to->relay_known=from->relay_known;to->relay_on=from->relay_on;
-    /* The PIN is device-owned too: web (v7) bodies never change it. */
-    memcpy(to->pin,from->pin,sizeof(to->pin));
 }
-/* Storage record 3: [3][len16][web v7 body][energy 33][relay 2]. Tags 1,4..7
- * are bare legacy web bodies, so the PIN variant uses the distinct tag 0x83.
- * Record 0x83 = record 3 + [pin length][pin digits]; written only while a PIN
- * is set, so PIN-less devices keep byte-identical version-3 records. */
 size_t mttl_settings_storage_pack(const mttl_settings *s,uint8_t *out,size_t cap){
-    size_t n,i,j,k;if(!s||!out||cap<38||s->relay_known>15||(s->relay_on&~s->relay_known))return 0;
-    k=length(s->pin,13);if(k==13||cap<38+(k?k+1:0))return 0;
-    n=mttl_settings_pack(s,out+3,cap-38-(k?k+1:0));if(!n)return 0;
-    out[0]=k?0x83:3;out[1]=(uint8_t)n;out[2]=(uint8_t)(n>>8);out[3+n]=s->energy_valid;
+    size_t n,i,j;if(!s||!out||cap<38||s->relay_known>15||(s->relay_on&~s->relay_known))return 0;
+    n=mttl_settings_pack(s,out+3,cap-38);if(!n)return 0;
+    out[0]=3;out[1]=(uint8_t)n;out[2]=(uint8_t)(n>>8);out[3+n]=s->energy_valid;
     for(i=0;i<8;i++){uint32_t v=i<4?s->energy_raw[i]:s->energy_wh[i-4];for(j=0;j<4;j++)out[4+n+4*i+j]=(uint8_t)(v>>(8*j));}
-    out[n+36]=s->relay_known;out[n+37]=s->relay_on;if(!k)return n+38;
-    out[n+38]=(uint8_t)k;for(i=0;i<k;i++)out[n+39+i]=(uint8_t)s->pin[i];return n+39+k;
+    out[n+36]=s->relay_known;out[n+37]=s->relay_on;return n+38;
 }
 int mttl_settings_storage_unpack(const uint8_t *body,size_t size,mttl_settings *out){
-    mttl_settings tmp;size_t n,i,j,extra=0;int ok=0;volatile uint8_t *wipe=(volatile uint8_t *)&tmp;
+    mttl_settings tmp;size_t n,i,j;int ok=0;volatile uint8_t *wipe=(volatile uint8_t *)&tmp;
     if(!body||!out||!size)return 0;
     if(body[0]==1||body[0]==4||body[0]==5||body[0]==6||body[0]==7)return mttl_settings_unpack(body,size,out);
-    if(body[0]==0x83){if(size<44)return 0;n=(size_t)body[1]|((size_t)body[2]<<8);if(n>size-39)return 0;extra=1+(size_t)body[n+38];}
-    else if((body[0]!=2&&body[0]!=3)||size<(body[0]==3?43:41))return 0;
-    if(size>MTTL_SETTINGS_BODY_MAX)return 0;
-    n=(size_t)body[1]|((size_t)body[2]<<8);if(n!=size-(body[0]==2?36:38)-extra)return 0;
+    if((body[0]!=2&&body[0]!=3)||size<(body[0]==3?43:41)||size>MTTL_SETTINGS_BODY_MAX)return 0;
+    n=(size_t)body[1]|((size_t)body[2]<<8);if(n!=size-(body[0]==3?38:36))return 0;
     if(!mttl_settings_unpack(body+3,n,&tmp))goto done;
     tmp.energy_valid=body[3+n];
-    if(body[0]!=2){tmp.relay_known=body[n+36];tmp.relay_on=body[n+37];if(tmp.relay_known>15||(tmp.relay_on&~tmp.relay_known))goto done;}
+    if(body[0]==3){tmp.relay_known=body[n+36];tmp.relay_on=body[n+37];if(tmp.relay_known>15||(tmp.relay_on&~tmp.relay_known))goto done;}
     for(i=0;i<8;i++){uint32_t v=0;for(j=0;j<4;j++)v|=(uint32_t)body[4+n+4*i+j]<<(8*j);if(i<4)tmp.energy_raw[i]=v;else tmp.energy_wh[i-4]=v;}
-    if(extra){if(extra<5||extra>13)goto done;for(i=0;i+1<extra;i++)tmp.pin[i]=(char)body[n+39+i];tmp.pin[i]=0;if(!mttl_pin_valid(tmp.pin))goto done;}
     if(!mttl_settings_valid(&tmp))goto done;*out=tmp;ok=1;
 done:for(i=0;i<sizeof(tmp);i++)wipe[i]=0;return ok;
 }

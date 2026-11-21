@@ -150,7 +150,7 @@ Repeated web OTA, settings/state persistence, Wi-Fi changes, MQTT broker restart
 and router-reboot recovery were verified on the development device. With 2.0.10, automatic reconnection was also verified when the strip starts before the router after a power outage. Actual watchdog
 stall recovery, all variants, measurement accuracy and long-term stability remain unverified.
 
-Trusted LANs only: HTTP/MQTT are unencrypted; apart from the optional PIN there is no web login, OTA token or
+Trusted LANs only: HTTP/MQTT are unencrypted; there is no web login, OTA token or
 firmware signature authentication. Never expose ports to the Internet. Origin checks
 are not user authentication.
 
@@ -195,28 +195,6 @@ See the [MTTL-W01 2.0 card installation guide](ha-card/README_EN.md) for standal
 Current metering counters become the new baseline, so only subsequent increments are accumulated. The reset is immediately saved to flash and survives reboot. Relay states, Wi-Fi/MQTT/protection settings and device/channel names are preserved. Ordinary reboot and automatic SoftAP entry do not reset energy.
 
 A held button triggers only once. Setup entry waits for valid channel counters and successful persistence, so sensor/storage errors may delay entry. A failed save preserves previous totals.
-
-## Optional PIN for control, OTA and settings
-
-Off by default; existing local scripts keep working unchanged. In **HA · MQTT → PIN**
-enter a **New PIN** (4–12 digits) and press **Save PIN** (leave it empty to remove the
-PIN). When a PIN is set, `POST /api/control`, `POST /api/firmware/upload` and
-`POST /api/config` require the header `X-MTTL-PIN`; changing or removing the PIN
-requires the current one. The dashboard keeps the PIN you type in the PIN field only
-for the current browser session (`sessionStorage`). GET endpoints stay open, and
-`GET /api/firmware/status` reports `"pin_required"`. After five wrong PINs every
-PIN-protected request is rejected (403) for 60 seconds. The dashboard confirms a PIN
-change only after the device reports it applied. See the [HTTP API](docs/HTTP_API_EN.md).
-
-**Forgotten PIN:** hold the physical main button for ten seconds (the existing Wi-Fi
-setup action). This removes the PIN in the same flash save as the energy reset
-(it waits for valid meter counters, like setup entry). **Remove the PIN before
-downgrading**: older firmware cannot read a record that contains a PIN and starts
-with default settings.
-
-The PIN is a guard against accidental or casual LAN access, not strong authentication:
-HTTP is unencrypted, so anyone who can observe LAN traffic can read it. Wi-Fi setup
-(`/api/wifi`), Wi-Fi scan and MQTT commands are not PIN-protected.
 
 ## Physical-button locks
 

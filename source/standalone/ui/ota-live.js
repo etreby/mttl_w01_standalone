@@ -31,7 +31,7 @@ const words={ko:['전원을 끄지 마세요. 지원: 독립 FWR, 순정 1.0.66,
   const expected=file.name.match(/-build-([0-9a-f]{16})\.fwr$/i)?.[1]?.toLowerCase();remember(expected);
   busy=true;result=6;detail='';render();const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),180000);
   try{
-   const response=await fetch('/api/firmware/upload',{method:'POST',headers:{'Content-Type':'application/x-mttl-fwr',...sha&&{'X-MTTL-SHA256':sha},...el('pin')?.value&&{'X-MTTL-PIN':el('pin').value}},body:file,signal:controller.signal,credentials:'omit'});
+   const response=await fetch('/api/firmware/upload',{method:'POST',headers:{'Content-Type':'application/x-mttl-fwr',...sha&&{'X-MTTL-SHA256':sha}},body:file,signal:controller.signal,credentials:'omit'});
    const raw=await response.text();let body;try{body=JSON.parse(raw);}catch(_){}
    if(response.ok&&body?.already_installed===true){result=11;detail='';remember(null);return;}
    if(!response.ok||!body?.written||!body?.activated){

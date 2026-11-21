@@ -1,5 +1,5 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const ids=['ota-hint','ota-file-label','firmware-update','firmware-status','firmware-picker','firmware-selected','firmware-file','language','firmware-form','firmware-expected','ota-token','current-build-id','firmware-sha','ota-sha-label','pin'];
+const ids=['ota-hint','ota-file-label','firmware-update','firmware-status','firmware-picker','firmware-selected','firmware-file','language','firmware-form','firmware-expected','ota-token','current-build-id','firmware-sha','ota-sha-label'];
 const elements=Object.fromEntries(ids.map(id=>[id,{textContent:'',value:'',files:[],click(){this.clicked=true;}}]));
 const document={documentElement:{lang:'ko'},getElementById:id=>elements[id]};
 elements.language.onclick=()=>{document.documentElement.lang=document.documentElement.lang==='ko'?'en':'ko';};
@@ -26,9 +26,6 @@ async function run(){
  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../ui/ota-live.js'),'utf8'),context);await new Promise(resolve=>setImmediate(resolve));
  elements['firmware-sha'].value='abc';await elements['firmware-form'].onsubmit({preventDefault(){}});assert.equal(posts.length,1);assert.match(elements['firmware-status'].textContent,/64 hex/);
  elements['firmware-sha'].value=' '+'AB'.repeat(32)+' ';await elements['firmware-form'].onsubmit({preventDefault(){}});assert.equal(posts.length,2);assert.equal(posts[1].options.headers['X-MTTL-SHA256'],'ab'.repeat(32));
- assert.equal(posts[1].options.headers['X-MTTL-PIN'],undefined);
- vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../ui/ota-live.js'),'utf8'),context);await new Promise(resolve=>setImmediate(resolve));
- elements['pin'].value='0042';await elements['firmware-form'].onsubmit({preventDefault(){}});assert.equal(posts[2].options.headers['X-MTTL-PIN'],'0042');elements['pin'].value='';posts.splice(2);
  elements['firmware-sha'].value='';
  // Failure stays disabled: no blind retry after uncertain activation.
  valid=false;vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../ui/ota-live.js'),'utf8'),context);await new Promise(resolve=>setImmediate(resolve));
@@ -52,6 +49,6 @@ async function run(){
  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../ui/ota-live.js'),'utf8'),context);await new Promise(resolve=>setImmediate(resolve));
  await elements['firmware-form'].onsubmit({preventDefault(){}});assert.match(elements['firmware-status'].textContent,/already installed/);assert.equal(elements['firmware-update'].disabled,false);assert.equal(storage.has('mttl.ota.pending-build'),false);
  elements.language.onclick();assert.match(elements['firmware-status'].textContent,/이미 설치된 펌웨어/);
- console.log(JSON.stringify({checks:38,failed:0,scope:'Mock OTA dashboard form; no device writes'}));
+ console.log(JSON.stringify({checks:36,failed:0,scope:'Mock OTA dashboard form; no device writes'}));
 }
 run().catch(e=>{console.error(e);process.exitCode=1;});
