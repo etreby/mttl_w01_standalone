@@ -104,6 +104,10 @@ existing registrations so cleanup can reach it.
 Discovery uses `homeassistant`. IDs follow `switch.mttl_<last 7 MAC digits>_sw1`;
 the aggregate switch ends in `_all`. Existing conflicts may cause HA to add a suffix.
 
+## Local HTTP control API
+
+Programs can request per-channel or all-channel ON/OFF with `POST /api/control` without MQTT. The API uses a 2-byte binary body and an `Origin` header, not a browser address-bar GET. See [request format, responses and Python/JavaScript examples](docs/HTTP_API_EN.md).
+
 ## Subsequent updates: device web OTA
 
 1. Download the latest standalone `.fwr`.
