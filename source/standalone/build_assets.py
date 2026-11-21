@@ -31,6 +31,15 @@ if options.ota_test:
     html=re.sub(r'<section id="firmware".*?</section>',lambda _:panel,html,flags=re.S)
     # OTA initialization is bundled with the common controller below: it cannot
     # be lost independently while the rest of the dashboard appears healthy.
+else:
+    # The no-OTA device build keeps the inert firmware panel, but its preview
+    # copy uses translations that are pruned below; drop or relabel it.
+    for pattern,replacement in [(r'<p class="muted" data-i18n="firmwareHint">.*?</p>',''),
+                                (r'<progress id="firmware-progress".*?</progress>',''),
+                                (r'<ol class="firmware-steps">.*?</ol>',''),
+                                (r'data-i18n="updateMock"','data-i18n="firmwareUpdate"')]:
+        html,count=re.subn(pattern,replacement,html,flags=re.S)
+        assert count==1,'Missing preview firmware markup: '+pattern
 # Device assets must not briefly display PC sample readings before JavaScript loads.
 for field, value in {'ip':'—','mac':'—','online':'—','connected-ssid':'—',
                      'rssi':'— dBm','uptime':'—','total':'— W','current':'— A','all':'—'}.items():
