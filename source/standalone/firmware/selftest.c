@@ -385,5 +385,6 @@ uint32_t mttl_selftest(void) {
     {extern void mttl_ota_identity_test(void);mttl_ota_identity_test();}
     {extern void mttl_ota_session_test(void);mttl_ota_session_test();}
     {extern void mttl_ota_upload_test(void);mttl_ota_upload_test();}
+    {extern void mttl_pin_test(void);mttl_pin_test();}
     return mttl_test_failed;
 }

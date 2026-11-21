@@ -6,6 +6,7 @@
 #include "ui_assets.h"
 #include "sdk_sse.h"
 #include "sdk_relay.h"
+#include "pin.h"
 #ifdef MTTL_OTA_TEST
 #include "ota_test_config.h"
 #include "sdk_ota_runtime.h"
@@ -59,10 +60,18 @@ static union {char json[1792];uint8_t settings[1024];
 } http_scratch __attribute__((section(".mttl.cache")));
 #define json http_scratch.json
 static int origin_ok(struct httpd_conn *c);
+/* Optional PIN (X-MTTL-PIN). 1 allowed; otherwise a 403 was sent. */
+static int pin_ok(struct httpd_conn *c){
+ char *v=0;int r;const char *m;httpd_request_get_header_field(c,"X-MTTL-PIN",&v);r=mttl_sdk_pin_check(v);if(v){volatile char *p=v;while(*p)*p++=0;httpd_free(v);}
+ if(r>0)return 1;m=r<0?"PIN locked; retry in 60 s":"PIN required";
+ if(httpd_response_write_header_start(c,"403 Forbidden","text/plain",strlen(m))>=0&&httpd_response_write_header_finish(c)>=0)httpd_response_write_data(c,(uint8_t *)m,strlen(m));
+ return 0;
+}
 static void control_page(struct httpd_conn *c){uint8_t body[2];size_t n=0;
  if(httpd_request_is_method(c,"GET")){uint32_t t[4];int length;mttl_sdk_control_timing(t);length=snprintf(json,sizeof(json),"{\"sequence\":%lu,\"wait_ms\":%lu,\"run_ms\":%lu,\"busy\":%lu}",(unsigned long)t[0],(unsigned long)t[1],(unsigned long)t[2],(unsigned long)t[3]);if(length>0&&(size_t)length<sizeof(json))response(c,json,length,"application/json");else httpd_conn_close(c);return;}
  if(!httpd_request_is_method(c,"POST")){httpd_response_method_not_allowed(c,0);goto close;}
  if(!origin_ok(c)||c->request.content_len!=2){httpd_response_bad_request(c,"Two-byte channel/on command required");goto close;}
+ if(!pin_ok(c))goto close;
  while(n<2){int count=httpd_request_read_data(c,body+n,2-n);if(count<=0||(size_t)count>2-n)goto close;n+=count;}
  if(!mttl_sdk_control_request(body[0],body[1])){httpd_response_too_many_requests(c,"Output disabled, busy or faulted");goto close;}
  {static const char accepted[]="{\"accepted\":true,\"contact_feedback\":false}";response(c,accepted,sizeof(accepted)-1,"application/json");return;}
@@ -71,18 +80,22 @@ close:httpd_conn_close(c);
 static void device_page(struct httpd_conn *c){size_t n=mttl_sdk_device_json(json,sizeof(json),0);if(!n){httpd_response_internal_server_error(c,0);httpd_conn_close(c);return;}send(c,json,n,"application/json");}
 /* Same-origin AP/LAN configuration; owner confirms persistent flash save. */
 static void config_page(struct httpd_conn *c){
-    uint8_t *body=http_scratch.settings;size_t used=0,n;int accepted=0;char *type=0;
+    uint8_t *body=http_scratch.settings;size_t used=0,n;int accepted=0,pin=0;char *type=0,new_pin[13]={0};
     if(httpd_request_is_method(c,"GET")){n=mttl_sdk_device_json(json,sizeof(json),1);if(n)send(c,json,n,"application/json");else{httpd_response_internal_server_error(c,0);httpd_conn_close(c);}return;}
     if(!httpd_request_is_method(c,"POST")){httpd_response_method_not_allowed(c,0);httpd_conn_close(c);return;}
     if(!origin_ok(c)){httpd_response_bad_request(c,"Same-origin required");httpd_conn_close(c);return;}
+    if(!pin_ok(c)){httpd_conn_close(c);return;}
+    /* Optional PIN change: "clear" or 4..12 digits; needs the current PIN above. */
+    {char *v=0;httpd_request_get_header_field(c,"X-MTTL-New-PIN",&v);if(v){if(!strcmp(v,"clear"))pin=1;else if(mttl_pin_valid(v)){strcpy(new_pin,v);pin=1;}else pin=2;{volatile char *p=v;while(*p)*p++=0;}httpd_free(v);}
+     if(pin==2){httpd_response_bad_request(c,"Invalid X-MTTL-New-PIN");httpd_conn_close(c);return;}}
     httpd_request_get_header_field(c,"Content-Type",&type);accepted=type&&!strcmp(type,"application/octet-stream");if(type)httpd_free(type);
     if(!accepted||!c->request.content_len||c->request.content_len>sizeof(http_scratch.settings)){httpd_response_bad_request(c,"Invalid settings body");httpd_conn_close(c);return;}accepted=0;
     while(used<c->request.content_len){int count=httpd_request_read_data(c,body+used,c->request.content_len-used);if(count<=0||(size_t)count>c->request.content_len-used)goto close;used+=(size_t)count;}
-    {char *keep=0;int preserve;httpd_request_get_header_field(c,"X-MTTL-Keep-Password",&keep);preserve=keep&&!strcmp(keep,"1");if(keep)httpd_free(keep);if(!mttl_sdk_config_reserve(body,used,preserve)){httpd_response_bad_request(c,"Invalid settings or not ready");goto close;}}
+    {char *keep=0;int preserve;httpd_request_get_header_field(c,"X-MTTL-Keep-Password",&keep);preserve=keep&&!strcmp(keep,"1");if(keep)httpd_free(keep);if(!mttl_sdk_config_reserve(body,used,preserve,pin?new_pin:0)){httpd_response_bad_request(c,"Invalid settings or not ready");goto close;}}
     {static const char response[]="{\"accepted\":true,\"pending\":true}";if(httpd_response_write_header_start(c,"202 Accepted","application/json",sizeof(response)-1)>=0&&httpd_response_write_header(c,"Connection","close")>=0&&httpd_response_write_header(c,"Cache-Control","no-store")>=0&&httpd_response_write_header_finish(c)>=0&&httpd_response_write_data(c,(uint8_t *)response,sizeof(response)-1)==sizeof(response)-1)accepted=1;}
     httpd_conn_close(c);mttl_sdk_config_release(accepted);goto wipe;
 close:httpd_conn_close(c);
-wipe:{volatile uint8_t *p=body;for(n=0;n<sizeof(http_scratch.settings);n++)p[n]=0;}
+wipe:{volatile uint8_t *p=body;for(n=0;n<sizeof(http_scratch.settings);n++)p[n]=0;p=(volatile uint8_t *)new_pin;for(n=0;n<sizeof(new_pin);n++)p[n]=0;}
 }
 /* Vendor ROM snprintf does not reliably implement %llu. */
 static void decimal64(uint64_t value,char out[32]){char reversed[20];unsigned n=0,i;do{reversed[n++]=(char)('0'+value%10);value/=10;}while(value);for(i=0;i<n;i++)out[i]=reversed[n-1-i];out[n]=0;}
@@ -136,7 +149,7 @@ cleanup:
 static void info(struct httpd_conn *c){send(c,version,sizeof(version)-1,"application/json");}
 #ifdef MTTL_OTA_TEST
 static void ota_status(struct httpd_conn *c){
-    uint32_t active=mttl_sdk_ota_probe();int n=snprintf(json,sizeof(json),"{\"version\":\"2.1.1\",\"build_id\":\"" MTTL_OTA_BUILD_ID "\",\"ota_ready\":%s,\"active_slot\":%lu,\"settings_persistent\":%s,\"restore_versions\":[\"1.0.66\",\"1.0.68\"],\"sha256_header\":true}",active?"true":"false",(unsigned long)active,mttl_sdk_settings_persistent()?"true":"false");
+    uint32_t active=mttl_sdk_ota_probe();int n=snprintf(json,sizeof(json),"{\"version\":\"2.1.1\",\"build_id\":\"" MTTL_OTA_BUILD_ID "\",\"ota_ready\":%s,\"active_slot\":%lu,\"settings_persistent\":%s,\"restore_versions\":[\"1.0.66\",\"1.0.68\"],\"sha256_header\":true,\"pin_required\":%s}",active?"true":"false",(unsigned long)active,mttl_sdk_settings_persistent()?"true":"false",mttl_sdk_pin_required()?"true":"false");
     if(n>0&&(size_t)n<sizeof(json))send(c,json,n,"application/json");else{httpd_response_internal_server_error(c,0);httpd_conn_close(c);}
 }
 static int ota_access(struct httpd_conn *c){
@@ -151,6 +164,7 @@ static void ota_upload(struct httpd_conn *c){
     uint8_t expected[32]={0},chunk[256];uint32_t received=0;char *value=0;int ok;mttl_ota_upload *u=&http_scratch.upload;
     if(!httpd_request_is_method(c,"POST")){httpd_response_method_not_allowed(c,0);goto close;}
     if(!ota_access(c)){httpd_response_bad_request(c,"Same-origin required");goto close;}
+    if(!pin_ok(c))goto close;
     value=0;httpd_request_get_header_field(c,"Content-Type",&value);ok=value&&!strcmp(value,"application/x-mttl-fwr");if(value)httpd_free(value);if(!ok){httpd_response_bad_request(c,"FWR required");goto close;}
     /* Optional published digest of the raw .fwr; validated before any erase. */
     value=0;httpd_request_get_header_field(c,"X-MTTL-SHA256",&value);ok=mttl_ota_upload_begin(u,value);if(value)httpd_free(value);if(!ok){httpd_response_bad_request(c,"Malformed X-MTTL-SHA256; no write");goto close;}

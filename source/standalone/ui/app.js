@@ -84,6 +84,8 @@
     connectedSsid=ssid;signal=-43;connectedAt=new Date();byId('wifi-password').value='';renderNetwork();time();status('wifi-status','wifiConnected');log('log_wifi');
   });
   byId('mqtt-form').addEventListener('submit',event=>{event.preventDefault();byId('mqtt-password').value='';status('mqtt-status',byId('enabled').checked?'enabled':'disabled');log(byId('enabled').checked?'log_mqttOn':'log_mqttOff');});
+  // Preview only: the PIN is enforced by the device; never stored or sent here.
+  byId('pin-form').addEventListener('submit',event=>{event.preventDefault();byId('pin-new').value='';});
   function protectionValues(){for(const key of ['temperature','current','power']){const input=byId('protect-'+key);byId('protect-'+key+'-value').textContent=(key==='current'?Number(input.value).toFixed(1):input.value)+' '+({temperature:'°C',current:'A',power:'W'}[key]);}}
   for(const key of ['temperature','current','power'])byId('protect-'+key).addEventListener('input',protectionValues);
   let firmwareGeneration=0,verifiedFirmware=null,firmwareBusy=false,firmwareMetadata=null;

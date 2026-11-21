@@ -8,6 +8,7 @@
 #include "semphr.h"
 #include "wifi_conf.h"
 #include "device_app.h"
+#include "pin.h"
 #include "sdk_mqtt_socket.h"
 #include "sdk_settings_flash.h"
 #include "sdk_ntp.h"
@@ -147,13 +148,18 @@ static size_t device_size;
 static mttl_settings pending_config __attribute__((section(".mttl.cache")));
 static uint8_t config_ready;
 static uint8_t config_keep_password;
+/* 1: apply pending_config.pin (set/clear via X-MTTL-New-PIN); 0: keep stored PIN. */
+static uint8_t config_pin_set;
+/* Successful configuration applies; lets the dashboard confirm a PIN change. */
+static uint32_t config_applied;
+static mttl_pin_gate pin_gate;
 static int timer_config_request(uint8_t channel,uint16_t minutes){
  int ok=0;
  taskENTER_CRITICAL();
  if(channel<4&&minutes<=1440&&!occupied&&!config_occupied&&!energy_barrier_state){
    if(device.settings.timer_minutes[channel]==minutes){device.mqtt_timer_known&=~(1u<<channel);ok=1;}
    else{pending_config=device.settings;pending_config.timer_minutes[channel]=minutes;
-     if(mttl_settings_valid(&pending_config)){config_keep_password=1;config_occupied=config_ready=1;ok=1;}
+     if(mttl_settings_valid(&pending_config)){config_keep_password=1;config_pin_set=0;config_occupied=config_ready=1;ok=1;}
      else memset(&pending_config,0,sizeof(pending_config));}
  }
  taskEXIT_CRITICAL();return ok;
@@ -194,10 +200,12 @@ void mttl_sdk_buttons_poll(void){unsigned i;uint32_t now;if(!buttons_ready)retur
   else if(setup_led_on){setup_led_on=0;gpio_write(&setup_led,0);}
  }
 }
-static __attribute__((noinline)) size_t config_snapshot(char *out,size_t cap){mttl_settings copy;int persistent;size_t n;taskENTER_CRITICAL();copy=device.settings;persistent=device.persistent;taskEXIT_CRITICAL();n=mttl_settings_json(&copy,persistent,out,cap);{volatile uint8_t *p=(volatile uint8_t *)&copy;size_t i;for(i=0;i<sizeof(copy);i++)p[i]=0;}return n;}
+static __attribute__((noinline)) size_t config_snapshot(char *out,size_t cap){mttl_settings copy;int persistent,m;uint32_t applied;size_t n;taskENTER_CRITICAL();copy=device.settings;persistent=device.persistent;applied=config_applied;taskEXIT_CRITICAL();n=mttl_settings_json(&copy,persistent,out,cap);
+ /* Non-secret PIN state only: whether one is set and the apply counter. */
+ if(n&&out[n-1]=='}'){m=snprintf(out+n-1,cap-n+1,",\"pin_set\":%s,\"applied\":%lu}",copy.pin[0]?"true":"false",(unsigned long)applied);n=m>0&&(size_t)m<cap-n+1?n-1+(size_t)m:0;}{volatile uint8_t *p=(volatile uint8_t *)&copy;size_t i;for(i=0;i<sizeof(copy);i++)p[i]=0;}return n;}
 size_t mttl_sdk_device_json(char *out,size_t cap,int settings){size_t n;if(settings)return config_snapshot(out,cap);taskENTER_CRITICAL();n=device_size;if(n&&n<cap){memcpy(out,device_json,n+1);}else n=0;taskEXIT_CRITICAL();return n;}
 int mttl_sdk_settings_persistent(void){return device.persistent!=0;}
-int mttl_sdk_config_reserve(const uint8_t *body,size_t n,int keep_password){int ok=0;mttl_settings candidate;if(!mttl_settings_unpack(body,n,&candidate))return 0;taskENTER_CRITICAL();if((ap_ready||published.state==MTTL_NET_ONLINE)&&!occupied&&!config_occupied&&!energy_barrier_state){pending_config=candidate;config_keep_password=keep_password!=0;config_occupied=1;ok=1;}taskEXIT_CRITICAL();{volatile uint8_t *p=(volatile uint8_t *)&candidate;size_t i;for(i=0;i<sizeof(candidate);i++)p[i]=0;}return ok;}
+int mttl_sdk_config_reserve(const uint8_t *body,size_t n,int keep_password,const char *pin){int ok=0;mttl_settings candidate;if(!mttl_settings_unpack(body,n,&candidate))return 0;if(pin)strcpy(candidate.pin,pin);taskENTER_CRITICAL();if((ap_ready||published.state==MTTL_NET_ONLINE)&&!occupied&&!config_occupied&&!energy_barrier_state){pending_config=candidate;config_keep_password=keep_password!=0;config_pin_set=pin!=0;config_occupied=1;ok=1;}taskEXIT_CRITICAL();{volatile uint8_t *p=(volatile uint8_t *)&candidate;size_t i;for(i=0;i<sizeof(candidate);i++)p[i]=0;}return ok;}
 void mttl_sdk_config_release(int accepted){taskENTER_CRITICAL();if(config_occupied){if(accepted)config_ready=1;else{memset(&pending_config,0,sizeof(pending_config));config_occupied=0;}}taskEXIT_CRITICAL();}
 static mttl_lifecycle life;
 static uint8_t scan_requested;
@@ -216,6 +224,9 @@ void mttl_sdk_status_snapshot(mttl_worker_status *out){taskENTER_CRITICAL();*out
 static void wipe(char *p,unsigned size){volatile char *q=p;while(size--)*q++=0;}
 static unsigned length(const char *p,unsigned max){unsigned n=0;while(n<=max&&p[n])++n;return n;}
 static uint32_t clock_ms(void *context){(void)context;return (uint32_t)xTaskGetTickCount()*portTICK_RATE_MS;}
+int mttl_sdk_pin_required(void){return device.settings.pin[0]!=0;}
+/* HTTP thread only (single-mode httpd owns pin_gate). */
+int mttl_sdk_pin_check(const char *given){char pin[13];int r;taskENTER_CRITICAL();memcpy(pin,device.settings.pin,13);taskEXIT_CRITICAL();r=mttl_pin_check(&pin_gate,pin,given,clock_ms(0));wipe(pin,13);return r;}
 /* Scratch exists only during serialization, on the existing 8 KiB worker
  * stack. noinline keeps it out of flash-save/configuration call chains. */
 static __attribute__((noinline)) void publish_snapshots(uint32_t now){
@@ -309,7 +320,11 @@ static void worker(void *p){
         {int provision=0;taskENTER_CRITICAL();if(provision_requested&&!relay_busy&&!energy_barrier_state&&!occupied&&!config_occupied){provision=1;}taskEXIT_CRITICAL();
          if(provision&&storage_begin()){int reset;
           if(!device.control.fault){device.settings.relay_known=device.control.known_mask;device.settings.relay_on=device.control.on_mask;}
-          reset=mttl_sdk_energy_reset(&device.settings,&device.samples,clock_ms(0));storage_end();
+          /* The 10 s hold also clears the PIN in the same flash save; restore on failure. */
+          /* energy_flush skips unchanged energy/relay payloads, so force the PIN-clearing save. */
+          {char pin[13];int kept=0;memcpy(pin,device.settings.pin,13);taskENTER_CRITICAL();memset(device.settings.pin,0,13);taskEXIT_CRITICAL();
+          reset=mttl_sdk_energy_reset(&device.settings,&device.samples,clock_ms(0));if(reset&&pin[0]&&mttl_sdk_settings_save(&device.settings)!=1)kept=1;
+          if(!reset||kept){taskENTER_CRITICAL();memcpy(device.settings.pin,pin,13);taskEXIT_CRITICAL();}wipe(pin,13);}storage_end();
           if(reset){taskENTER_CRITICAL();provision_requested=0;taskEXIT_CRITICAL();manual_setup=1;mttl_provision(&life.network,clock_ms(0));}
          }}
         {uint8_t state;taskENTER_CRITICAL();state=energy_barrier_state;taskEXIT_CRITICAL();
@@ -318,14 +333,14 @@ static void worker(void *p){
         if(config_now&&storage_begin()){
             memcpy(pending_config.ssid,device.settings.ssid,33);memcpy(pending_config.wifi_password,device.settings.wifi_password,65);
             if(config_keep_password)memcpy(pending_config.mqtt_password,device.settings.mqtt_password,65);
-            mttl_settings_keep_energy(&pending_config,&device.settings);
+            {char pin[13];memcpy(pin,pending_config.pin,13);mttl_settings_keep_energy(&pending_config,&device.settings);if(config_pin_set)memcpy(pending_config.pin,pin,13);wipe(pin,13);}
             /* Flash operations never run with scheduler/interrupts disabled. */
             if(mttl_settings_valid(&pending_config)&&mttl_sdk_settings_save(&pending_config)==1){
               if(memcmp(&device.settings.schedule,&pending_config.schedule,sizeof(pending_config.schedule)))schedule_state.primed=0;
               {int mqtt_changed=mttl_settings_mqtt_changed(&device.settings,&pending_config);
-              taskENTER_CRITICAL();device.settings=pending_config;mttl_timer_tick(&device.timers,device.settings.timer_minutes,relay_known,relay_on,clock_ms(0));if(mqtt_changed)++device.revision;device.persistent=1;taskEXIT_CRITICAL();}device.protection.current_count=device.protection.power_count=0;}
+              taskENTER_CRITICAL();device.settings=pending_config;mttl_timer_tick(&device.timers,device.settings.timer_minutes,relay_known,relay_on,clock_ms(0));if(mqtt_changed)++device.revision;device.persistent=1;++config_applied;taskEXIT_CRITICAL();}device.protection.current_count=device.protection.power_count=0;}
             storage_end();
-            taskENTER_CRITICAL();wipe((char *)&pending_config,sizeof(pending_config));config_ready=config_occupied=0;device.mqtt_timer_known=0;taskEXIT_CRITICAL();
+            taskENTER_CRITICAL();wipe((char *)&pending_config,sizeof(pending_config));config_ready=config_occupied=config_pin_set=0;device.mqtt_timer_known=0;taskEXIT_CRITICAL();
         }
         taskENTER_CRITICAL();
         if(ready){manual_setup=1;if(mttl_wifi_submit(&life.network,(const uint8_t *)requested_ssid,length(requested_ssid,32),(const uint8_t *)requested_password,length(requested_password,64),clock_ms(0))){life.join_started=life.dhcp_started=0;}

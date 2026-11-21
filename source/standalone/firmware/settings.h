@@ -11,6 +11,9 @@ typedef struct {
     uint8_t language,mqtt_enabled;
     uint8_t button_lock; /* Bit 0..3: inhibit physical channel buttons only. */
     uint16_t timer_minutes[4]; /* 0 unregistered, 1..1440 automatic OFF. */
+    /* Optional control/OTA/config PIN (empty or 4..12 digits). Device-owned:
+     * never part of the web (version 7) encoding or any JSON response. */
+    char pin[13];
     /* Device-owned checkpoint; excluded from web configuration encoding. */
     uint32_t energy_raw[4],energy_wh[4];
     uint8_t energy_valid;
@@ -29,5 +32,6 @@ size_t mttl_settings_pack(const mttl_settings *s,uint8_t *out,size_t capacity);
 int mttl_settings_unpack(const uint8_t *body,size_t size,mttl_settings *out);
 size_t mttl_settings_storage_pack(const mttl_settings *,uint8_t *,size_t);
 int mttl_settings_storage_unpack(const uint8_t *,size_t,mttl_settings *);
+/* Copy device-owned fields (energy, relay checkpoint, PIN) across a web update. */
 void mttl_settings_keep_energy(mttl_settings *,const mttl_settings *);
 #endif

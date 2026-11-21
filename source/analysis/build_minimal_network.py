@@ -70,6 +70,7 @@ if args.standalone:
  sources.append(ROOT/'standalone/firmware/sdk_httpd_msg.c')
  sources.append(ROOT/'standalone/firmware/settings_record.c')
  sources.append(ROOT/'standalone/firmware/settings.c')
+ sources.append(ROOT/'standalone/firmware/pin.c')
  sources.append(ROOT/'standalone/firmware/protection.c')
  sources.append(ROOT/'standalone/firmware/scheduler.c')
  sources.append(ROOT/'standalone/firmware/settings_store.c')

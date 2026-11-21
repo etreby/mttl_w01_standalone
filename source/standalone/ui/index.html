@@ -81,6 +81,11 @@
       <label><input id="enabled" type="checkbox"><span data-i18n="mqttEnable">MQTT 연동 활성화</span></label>
       <div class="row"><button class="primary" data-i18n="saveMock">저장 모의</button></div><div id="mqtt-status" class="status" role="status">Disabled</div>
     </form></div>
+    <div class="panel"><h2>PIN</h2><form id="pin-form">
+      <label for="pin" data-i18n="pinCurrent">PIN</label><input id="pin" type="password" inputmode="numeric" maxlength="12" autocomplete="off">
+      <label for="pin-new" data-i18n="pinNew">새 PIN</label><input id="pin-new" type="password" inputmode="numeric" maxlength="12" autocomplete="off">
+      <div class="row"><button class="primary" data-i18n="pinSave">PIN 저장</button></div><div id="pin-status" class="status" role="status"></div>
+    </form></div>
   </section>
   <section id="protection" role="tabpanel" aria-labelledby="tab-protection">
     <div class="panel"><h2 data-i18n="protection">보호 설정</h2><p class="muted" data-i18n="protectionHint">온도는 첫 초과, 전체 전류·전력은 2회 연속 초과 시 전체 OFF합니다. 측정 주기는 약 10초입니다.</p>

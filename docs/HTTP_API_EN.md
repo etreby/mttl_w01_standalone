@@ -8,7 +8,7 @@ This documents the API used by the dashboard in the current public firmware, 2.1
 
 - The strip must be connected to the router and online. Web relay commands are rejected in SoftAP mode.
 - Use `http://<the strip's current IPv4 address>`. Addresses below are examples.
-- There is no authentication token; the `Origin` check is not authentication. Use only on a trusted LAN and do not expose the port to the internet.
+- There is no authentication token; the `Origin` check is not authentication. An optional PIN can be set (see [Optional PIN](#optional-pin-x-mttl-pin)); without one, behaviour is unchanged. Use only on a trusted LAN and do not expose the port to the internet.
 - This is not a CORS API for other websites. Run the browser example in the strip dashboard's developer console. External programs must supply the `Origin` header themselves.
 
 ## POST /api/control
@@ -57,6 +57,7 @@ The browser supplies `Origin` for the POST. Running this example on another webs
 |---|---|
 | `200` | Command accepted into the control queue; not confirmation of completed relay switching |
 | `400` | Missing/mismatched `Origin`, or body length is not two bytes |
+| `403` | A PIN is set and `X-MTTL-PIN` is missing or wrong (`PIN required`), or five consecutive wrong PINs locked PIN-protected requests for 60 seconds (`PIN locked; retry in 60 s`) |
 | `429` | Rejected: invalid channel/action, full queue, offline state, OTA/configuration work, hardware/relay fault, etc. |
 | `405` | Unsupported method other than GET or POST |
 
@@ -83,6 +84,7 @@ Uploads a `.fwr` file into the inactive slot and, only after every check passes,
 | `Origin` | yes | `http://<current IPv4 address>` |
 | `Content-Type` | yes | `application/x-mttl-fwr` |
 | `Content-Length` | yes | Exact `.fwr` size (44 to 434196 bytes) |
+| `X-MTTL-PIN` | when a PIN is set | The current PIN (see [Optional PIN](#optional-pin-x-mttl-pin)) |
 | `X-MTTL-SHA256` | no | 64 hexadecimal characters (either case): SHA-256 of the **raw `.fwr` file exactly as uploaded**, i.e. the value `sha256sum file.fwr` prints and an OTA server publishes |
 
 The body is the raw `.fwr` file. The whole request header block must fit in 1024 bytes; send `X-MTTL-SHA256` once (a duplicated header line is treated as absent).
@@ -106,3 +108,25 @@ print(urllib.request.urlopen(request, timeout=180).read().decode())
 ```
 
 Success responses are `{"written":true,"activated":true,"rebooting":true}` (optionally with `restore_version`) or `{"already_installed":true,"activated":false,"rebooting":false}`.
+
+## Optional PIN (X-MTTL-PIN)
+
+No PIN is set by default, and then nothing changes. When a PIN (4–12 ASCII digits) is set, these requests must carry `X-MTTL-PIN: <pin>`:
+
+- `POST /api/control`
+- `POST /api/firmware/upload`
+- `POST /api/config`
+
+The PIN is compared in constant time. A missing or wrong PIN returns `403 PIN required`. After five consecutive wrong PINs, every PIN-protected request returns `403 PIN locked; retry in 60 s` for 60 seconds (a missing header does not count as a wrong PIN; a correct PIN resets the counter). GET endpoints stay open and never return the PIN. `GET /api/firmware/status` reports `"pin_required":true|false`; `GET /api/config` reports `"pin_set"` and `"applied"`, a counter of successfully applied configuration saves that a client can use to confirm a PIN change took effect. Wi-Fi setup/scan and MQTT commands are not PIN-protected.
+
+**Set, change or remove:** send the normal settings body to `POST /api/config` with `X-MTTL-New-PIN: <4–12 digits>` or `X-MTTL-New-PIN: clear`, plus the current `X-MTTL-PIN` when one is set. An invalid value returns `400 Invalid X-MTTL-New-PIN`. A `POST /api/config` without `X-MTTL-New-PIN` keeps the stored PIN, so existing scripts cannot clear it accidentally.
+
+**Forgotten PIN:** hold the physical main button for ten seconds (Wi-Fi setup entry). The PIN is removed in the same flash save as the energy reset; like setup entry itself, this waits until valid meter counters are available.
+
+**Downgrading:** firmware without PIN support cannot read a settings record that contains a PIN and starts with default settings (setup AP). Remove the PIN before installing older firmware.
+
+The PIN travels over unencrypted HTTP; it protects against accidental or casual LAN access, not against someone who can observe LAN traffic.
+
+```python
+headers = {'Content-Type': 'application/octet-stream', 'Origin': base, 'X-MTTL-PIN': '2468'}
+```
