@@ -1,7 +1,7 @@
 # MTTL-W01 Recovery 1.1
 
 
-[한국어](README.md) | English
+English documentation
 
 [Download recovery tool](https://github.com/af950833/mttl_w01_standalone/releases/tag/recovery-v1.1) · [Project](../README_EN.md) · [Third-party components](THIRD_PARTY_NOTICES.md)
 

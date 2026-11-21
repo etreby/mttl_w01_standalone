@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MTTL-W01 독립 펌웨어 화면 초안</title>
+<title>MTTL-W01 · Local control</title>
 <style>
   :root{font:14px/1.5 "Segoe UI Variable","Apple SD Gothic Neo","Malgun Gothic",sans-serif;color:#1e293b;background:#f5f7fb;accent-color:#2563eb;--line:#e2e8f0;--muted:#64748b;--blue:#2563eb}
   *{box-sizing:border-box}body{margin:0}header{background:#0f172a;color:white;padding:22px max(24px,calc((100% - 1152px)/2));display:flex;justify-content:space-between;align-items:center;gap:16px}h1{font-size:21px;letter-spacing:-.6px;margin:0}h2{font-size:19px;letter-spacing:-.4px;margin:0 0 20px}
@@ -17,7 +17,15 @@
   #timer-form{max-width:none}#timer-editor{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}#timer-editor>p,#timer-editor>button{grid-column:1/-1}#timer-editor>.name-editor{min-width:0;margin:0;padding:16px}#timer-editor .row{gap:8px;margin-top:8px}#timer-editor .row label{flex:1;min-width:0}#timer-editor .row input{width:100%!important}#timer-editor .row button{width:100%}
   #timer-editor>button{justify-self:center;width:auto;min-width:140px}#timer-editor>.name-editor>b{display:block;text-align:center}#timer-editor .row label{text-align:center}#timer-editor .row input{text-align:right}
   #log{height:600px}
-  @media(max-width:900px){#timer-editor{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:480px){#timer-editor{grid-template-columns:1fr}}
+  @media(max-width:900px){#timer-editor{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:480px){.channels,#timer-editor{grid-template-columns:1fr}}
+  :root{font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;color:#eaf3f6;background:#0c1925;accent-color:#31d6b1;--line:#344d5b;--muted:#9db3bf;--blue:#31d6b1}
+  body{min-height:100vh}header{background:#0c1925;padding-top:20px;padding-bottom:20px}header h1{font-size:23px;letter-spacing:-.03em}main{margin-top:30px;margin-bottom:50px}
+  nav{background:#172c3a;padding:5px;border:1px solid #294552;border-radius:12px;margin-bottom:22px}nav button{color:#afc4cd;padding:10px 15px}nav button[aria-selected=true]{background:#31d6b1;color:#07302b}
+  .panel,.channel{background:#142b3a;border:1px solid #315061;border-radius:18px;box-shadow:0 12px 28px #0004}.panel{padding:28px}.device-heading h2{font-size:28px;color:#fff}.meta b{color:#e1f8f0;font-weight:650}
+  .summary{gap:10px}.summary div{background:#0c202d;border:1px solid #315061;border-radius:12px;padding:17px 10px}.summary small{font-size:12px;color:#9db3bf}.summary b{font-size:22px;color:#62ead0}
+  .channels{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.channel{border-left:5px solid #526e7d;padding:20px}.channel.on{border-left-color:#31d6b1}.channel-head{border-bottom-color:#315061}.channel-head>h2{font-size:20px}.sensor{border-bottom:1px solid #284451;padding-bottom:9px;margin:10px 0}.sensor b{color:#f5fbff}.channel .switch{background:#274450;color:#e5f6f4}.channel .switch.is-on,.channel.on .switch{background:#31d6b1;color:#07302b}
+  button{background:#213b4a;color:#eaf3f6;border-color:#476676}button:hover{background:#2d5260;color:#fff}.primary{background:#31d6b1;border-color:#31d6b1;color:#07302b}.primary:hover:not(:disabled){background:#24bb9a;border-color:#24bb9a;color:#07302b}input,select{background:#0e2330;color:#fff}.name-editor{background:#0e2330}
+  @media(max-width:600px){header{padding:17px 18px}main{margin-top:18px}.panel{padding:19px}.summary{grid-template-columns:repeat(2,minmax(0,1fr))}.summary b{font-size:18px}.channels{grid-template-columns:1fr;gap:10px}.channel{padding:15px}nav{margin-inline:-2px}}
 </style>
 <header><h1>MTTL-W01</h1><div class="header-tools"><span class="badge" data-i18n="simulation">PC 모의 화면</span><button id="language" type="button">English</button></div></header>
 <main>

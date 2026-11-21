@@ -2,7 +2,7 @@
 (function(){
   'use strict';
   const el=id=>document.getElementById(id),key='mttl.preview.display.v1';
-  let language='ko',preferences={},snapshot=null,deviceSnapshot=null,configuration=null,composing=false,wifiMessage=null,controlBusy=false;
+  let language='en',preferences={},snapshot=null,deviceSnapshot=null,configuration=null,composing=false,wifiMessage=null,controlBusy=false;
   let events=null,eventConnected=false;
   let relaySnapshot=null;
   function applyRelay(){if(!relaySnapshot||!deviceSnapshot)return;deviceSnapshot.channels.forEach((c,i)=>{c.on=relaySnapshot.known&(1<<i)?!!(relaySnapshot.on&(1<<i)):null;});if(relaySnapshot.fault)deviceSnapshot.hardware_ready=false;}
@@ -55,7 +55,7 @@
     events.addEventListener('relay',event=>{try{const d=JSON.parse(event.data);if(![d.known,d.on,d.fault].every(Number.isInteger)||d.known<0||d.known>15||d.on<0||d.on>15||d.fault<0)throw Error('Relay');relaySnapshot=d;applyRelay();render();}catch(_){eventConnected=false;}});
     events.addEventListener('device',event=>{try{const d=JSON.parse(event.data);if(!Array.isArray(d.channels)||d.channels.length!==4)throw Error('Device');deviceSnapshot=d;applyRelay();render();}catch(_){eventConnected=false;}});
   }
-  try{preferences=JSON.parse(localStorage.getItem(key)||'{}');if(preferences.language==='en')language='en';}catch(_){preferences={};}
+  try{preferences=JSON.parse(localStorage.getItem(key)||'{}');if(preferences.language==='ko')language='ko';}catch(_){preferences={};}
   const t=(name,args={})=>MttlI18n.text(language,name,args);
   function save(){preferences.language=language;try{localStorage.setItem(key,JSON.stringify(preferences));}catch(_){}}
   function goodName(v){return typeof v==='string'&&v.trim()&&new TextEncoder().encode(v.trim()).length<=64&&!/[\x00-\x1f\x7f]/.test(v);}
@@ -100,7 +100,7 @@ async function storeConfiguration(c,password='',keep=true){if(![2,5].includes(sn
         sensors.push({text,value,label,unit,field,scale});
       }
       const timerRow=document.createElement('div');timerRow.className='sensor';const timerLabel=document.createElement('span'),timer=document.createElement('b');timerRow.setAttribute('aria-live','off');timerRow.append(timerLabel,timer);card.append(timerRow);
-      const button=document.createElement('button');button.className='switch';button.onclick=()=>{const on=optimistic.has(i)?optimistic.get(i):deviceSnapshot?.channels?.[i]?.on;return control(i,on===true?0:1);};card.append(button);el('channels').append(card);
+      const button=document.createElement('button');button.className='switch';button.onclick=()=>{const on=optimistic.has(i)?optimistic.get(i):deviceSnapshot?.channels?.[i]?.on;if(on==null&&!confirm(language==='en'?'Outlet state is unverified. Sending ON may change power to connected equipment. Continue?':'콘센트 상태를 확인할 수 없습니다. 켜기 명령이 연결된 기기의 전원을 바꿀 수 있습니다. 계속할까요?'))return;return control(i,on===true?0:1);};card.append(button);el('channels').append(card);
       const lock=document.createElement('button');lock.className='edit-name channel-lock';lock.onclick=()=>toggleLock(i);header.append(lock);
       channelNodes[i]={title,pencil,button,sensors,lock,timer,timerLabel};
       }
@@ -108,7 +108,7 @@ async function storeConfiguration(c,password='',keep=true){if(![2,5].includes(sn
       const locked=!!((configuration?.button_lock||0)&(1<<i));node.lock.textContent=locked?'🔒':'🔓';node.lock.title=language==='en'?(locked?'Locked: physical button disabled':'Unlocked: physical button enabled'):(locked?'잠김: 물리 버튼 비활성화':'잠금 해제: 물리 버튼 사용');node.lock.setAttribute('aria-label',node.lock.title);node.lock.setAttribute('aria-pressed',String(locked));node.lock.disabled=lockPending.has(i)||!configuration||![2,5].includes(snapshot?.state);
       for(const sensor of node.sensors){sensor.text.textContent=t(sensor.label);const value=reading(deviceSnapshot?.channels?.[i]?.[sensor.field],sensor.scale,sensor.unit);if(sensor.value.textContent!==value)sensor.value.textContent=value;}
       node.button.disabled=pendingChannels.has(i)||pendingChannels.has(4)||!deviceSnapshot?.hardware_ready||!snapshot?.hardware_ready||snapshot?.state!==5;
-      const on=optimistic.has(i)?optimistic.get(i):deviceSnapshot?.channels?.[i]?.on,value=on===true?'ON':on===false?'OFF':(language==='en'?'Turn on':'켜기');if(node.button.textContent!==value)node.button.textContent=value;
+      const on=optimistic.has(i)?optimistic.get(i):deviceSnapshot?.channels?.[i]?.on,value=on===true?'ON':on===false?'OFF':(language==='en'?'Unknown · Turn on':'상태 미확인 · 켜기');if(node.button.textContent!==value)node.button.textContent=value;
       const style=on===true?'switch is-on':'switch';if(node.button.className!==style)node.button.className=style;
     }
     drawTimers();

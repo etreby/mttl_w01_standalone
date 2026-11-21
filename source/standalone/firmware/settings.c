@@ -33,6 +33,7 @@ void mttl_settings_default(mttl_settings *s){
     size_t i;const char name[]="MTTL-W01";unsigned char *p=(unsigned char *)s;
     for(i=0;i<sizeof(*s);i++)p[i]=0;
     for(i=0;i<sizeof(name);i++)s->device[i]=name[i];
+    s->language=1; /* English is the default for fresh installations. */
     for(i=0;i<4;i++){s->channel[i][0]='S';s->channel[i][1]='W';s->channel[i][2]=' ';s->channel[i][3]=(char)('1'+i);}
     s->port=1883;s->topic[0]='m';s->topic[1]='t';s->topic[2]='t';s->topic[3]='l';
     mttl_protection_default(&s->protection);

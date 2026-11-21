@@ -1,6 +1,6 @@
 # MTTL-W01 Standalone Firmware
 
-[한국어](README.md) | English
+English documentation
 
 > **Users of 2.0.x are advised to upgrade to 2.1.x or later.** Version 2.0.x repeatedly saves settings and energy data to a small set of fixed flash sectors, which can accumulate wear during prolonged use. Version 2.1.x uses 128KiB circular storage and hourly energy saves to reduce erase frequency and distribute wear. This does not mean an existing device has already exhausted its flash endurance. **On the first upgrade from 2.0.x to 2.1.x, existing settings and energy data are not migrated; Wi-Fi and other settings must be configured again.**
 
@@ -13,7 +13,9 @@ Download and install the FWR below without building it yourself.
 Direct Wi-Fi web control and Home Assistant MQTT integration for the LG U+
 MTTL-W01, without a separate backend or router DNAT.
 
-![MTTL-W01 web dashboard](docs/dashboard.png)
+![English-first MTTL-W01 dashboard preview with synthetic readings](docs/dashboard-dark.png)
+
+[View the mobile dashboard preview](docs/dashboard-dark-mobile.png). The screenshots use synthetic documentation data and show the custom source on this fork branch. The downloadable 2.1.1 FWR below is the original upstream release; it does **not** include this redesigned interface. The custom image has not passed physical-device validation and is not published as a release.
 
 ### Firmware download
 
@@ -66,7 +68,7 @@ Apple silicon Mac for initial installation. HA requires an MQTT broker/integrati
 
 ## Initial installation: Windows / macOS OTA tool
 
-Use [ttaengz's OTA tools](https://github.com/ttaengz/mttl-w01-matterbridge#펌웨어-업데이트).
+Use [ttaengz's OTA tools](https://github.com/ttaengz/mttl-w01-matterbridge).
 Download the **OTA tool**, not the separate Wi-Fi configuration tool. Follow the
 upstream instructions for supported operating systems and tool controls.
 
@@ -308,7 +310,7 @@ If a problem during a firmware update makes web OTA unavailable, see the [ST Lin
 - Automatic month-end/leap-year calculation, missing-date skipping and later-row precedence for conflicts
 - Fixed UTC offset selection, NTP gating and no replay of events missed during reboot or clock correction
 - Atomic batch admission through the existing relay queue, with retries only within the scheduled minute
-- Single-bordered time editor with Korean 오전/오후 and English AM/PM
+- Single-bordered time editor with Korean morning/afternoon markers and English AM/PM
 - Compressed web assets and on-demand settings JSON preserve existing heap/stack reservations
 - Passed 470 scheduler ARM checks plus UI, settings, relay, SSE and memory checks; successful operation confirmed in user device testing
 

@@ -5,7 +5,7 @@
   const timerEnds=[0,0,0,0];
   function setChannel(i,on){if(on&&!states[i]&&preferences.timerMinutes[i])timerEnds[i]=Date.now()+preferences.timerMinutes[i]*60000;if(!on)timerEnds[i]=0;states[i]=on;}
   function validName(value){return typeof value==='string'&&value.trim().length>0&&new TextEncoder().encode(value.trim()).length<=64&&!/[\x00-\x1f\x7f]/.test(value);}
-  let preferences={language:'ko',deviceName:null,channelNames:[null,null,null,null],buttonLocks:[false,false,false,false],timerMinutes:[0,0,0,0]};
+  let preferences={language:'en',deviceName:null,channelNames:[null,null,null,null],buttonLocks:[false,false,false,false],timerMinutes:[0,0,0,0]};
   try{
     const saved=JSON.parse(localStorage.getItem(PREF_KEY)||'null');
     if(saved&&typeof saved==='object'){
