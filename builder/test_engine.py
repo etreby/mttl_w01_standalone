@@ -1,16 +1,14 @@
 from pathlib import Path
-import hashlib,io,json,os,tempfile,threading,unittest,zipfile
+import hashlib,io,json,os,re,tempfile,threading,unittest,zipfile
 from unittest.mock import patch
 from engine import Engine,Cancelled
-from i18n import translate,MESSAGES
 
 class Tests(unittest.TestCase):
-    def test_languages(self):
-        for ko,en in MESSAGES.items():
-            with self.subTest(message=ko):
-                self.assertEqual(translate(ko,'ko'),ko)
-                self.assertEqual(translate(ko,'en'),en)
-        self.assertEqual(translate('빌드 성공: C:/Temp/output.fwr','en'),'Build succeeded: C:/Temp/output.fwr')
+    def test_english_only(self):
+        for name in ('app.py','engine.py'):
+            with self.subTest(file=name):
+                text=(Path(__file__).parent/name).read_text(encoding='utf-8')
+                self.assertIsNone(re.search('[\u1100-\u11ff\u3130-\u318f\uac00-\ud7a3]',text))
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name);self.engine=Engine(self.root,{'artifacts':[]},log=lambda s:None)
     def tearDown(self):self.temp.cleanup()
