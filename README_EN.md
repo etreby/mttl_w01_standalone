@@ -8,22 +8,37 @@ Project-authored code is available under the [MIT License](LICENSE). Third-party
 
 ## Prebuilt firmware — ready to install
 
-Download and install the FWR below without building it yourself.
+Download the signed FWR from GitHub Releases and install it without building it yourself.
 
 Direct Wi-Fi web control and Home Assistant MQTT integration for the LG U+
 MTTL-W01, without a separate backend or router DNAT.
 
 ![English-first MTTL-W01 dashboard preview with synthetic readings](docs/dashboard-dark.png)
 
-[View the mobile dashboard preview](docs/dashboard-dark-mobile.png). The screenshots use synthetic documentation data and show the custom source on this fork branch. The downloadable 2.1.1 FWR below is the original upstream release; it does **not** include this redesigned interface. The custom image has not passed physical-device validation and is not published as a release.
+[View the mobile dashboard preview](docs/dashboard-dark-mobile.png). The screenshots use synthetic documentation data.
 
 ### Firmware download
 
-**2.1.1 / build `33231c0032fa013b` · October 22, 2026**
+**[Latest release on GitHub](https://github.com/etreby/mttl_w01_standalone/releases/latest)** — English-only 2.2.x line of this fork. Upstream's Korean images (2.0.x–2.1.1) are no longer kept in this repository; they remain in the git history and in the [original repository's releases](https://github.com/af950833/mttl_w01_standalone/releases).
 
-[Download comMTTL-W01_2.1.1.fwr](firmware/comMTTL-W01_2.1.1.fwr)
+Each release is built by GitHub Actions from the tagged source (`.github/workflows/release.yml`) and has these assets:
 
-SHA-256: `362f92df30f16fadcfd012ba20557ce58466f08706e99bca6cf6e1f67ae1ce9f`
+| Asset | Contents |
+| --- | --- |
+| `comMTTL-W01_<version>-build-<build id>.fwr` | Firmware to install. The build ID is shown in the device's Firmware tab after installation. |
+| `SHA256SUMS-<version>.txt` | SHA-256 of the FWR and the build manifest. Paste the FWR value into **Expected SHA-256** when uploading. |
+| `SHA256SUMS-<version>.txt.sig` | Detached Ed25519 signature (base64) over the SHA256SUMS file, made with the release key whose public half is in [`source/standalone/firmware/pull_key.h`](source/standalone/firmware/pull_key.h). |
+| `comMTTL-W01_<version>-build-<build id>.manifest.json` | Build manifest: static memory gap, ELF/BIN/FWR hashes and validation flags. |
+
+Verify a download before installing (needs Python 3 and the `cryptography` package):
+
+```sh
+python3 tools/verify_release.py --dir <folder with the downloaded assets>
+```
+
+It checks the signature against the key in `pull_key.h` and every listed file against `SHA256SUMS`. See [docs/RELEASING.md](docs/RELEASING.md) for details.
+
+**The 2.2.x images have not yet passed physical-device validation.** Keep a wired recovery option available (see below).
 
 > **First installation of 2.1.x:** Settings and energy from 2.0.x are not migrated. After reboot, join `MTTL-W01-SETUP` and reconfigure Wi-Fi and other settings. The device may not return to its old IP. Web downgrade to 2.0.x is unsupported; Recovery 1.0.0 does not support the new storage format.
 
@@ -72,7 +87,7 @@ Use [ttaengz's OTA tools](https://github.com/ttaengz/mttl-w01-matterbridge).
 Download the **OTA tool**, not the separate Wi-Fi configuration tool. Follow the
 upstream instructions for supported operating systems and tool controls.
 
-1. Download this repository's `comMTTL-W01_2.1.1.fwr` and the OTA tool for your operating system.
+1. Download the `.fwr` from the [latest release](https://github.com/etreby/mttl_w01_standalone/releases/latest), verify it, and download the OTA tool for your operating system.
 2. Hold the stock device's main button for at least ten seconds to enter setup.
 3. Connect the PC to `TONLY_TAP_xxxxxxx`, using password `LGU_xxxxxxx` with the
    same suffix shown in the AP name.
@@ -110,7 +125,7 @@ Programs can request individual/all-channel ON/OFF through `POST /api/control` w
 
 ## Subsequent updates: device web OTA
 
-1. Download the latest standalone `.fwr`.
+1. Download the `.fwr` and `SHA256SUMS` from the [latest release](https://github.com/etreby/mttl_w01_standalone/releases/latest) and verify them with `tools/verify_release.py`.
 2. Open the device's Firmware tab, select the file and upload.
 3. Keep power connected, reconnect after automatic reboot and verify the build.
 
@@ -210,7 +225,9 @@ OFF→ON starts the timer; OFF cancels it. Repeated ON commands do not restart i
 
 ## Firmware Builder 1.0.0 and source
 
-[Download Builder 1.0.0](https://github.com/af950833/mttl_w01_standalone/releases/tag/builder-v1.0.0) · [Firmware 2.1.1 and Source ZIP](https://github.com/af950833/mttl_w01_standalone/releases/tag/v2.1.1)
+[Download Builder 1.0.0](https://github.com/af950833/mttl_w01_standalone/releases/tag/builder-v1.0.0) · [Latest firmware release](https://github.com/etreby/mttl_w01_standalone/releases/latest) · [Upstream 2.1.1 and Source ZIP](https://github.com/af950833/mttl_w01_standalone/releases/tag/v2.1.1)
+
+On Linux, `python3 builder/linux_build.py --source source --cache <dir>` builds with the same pinned SDK and toolchain; releases use it.
 
 [Builder usage guide](builder/README_EN.md) · [Firmware source guide](source/README_EN.md)
 

@@ -2,7 +2,7 @@
 
 Build: `981749bcbdfe3915`
 
-FWR: [comMTTL-W01_2.0.17.fwr](../firmware/comMTTL-W01_2.0.17.fwr)
+FWR: `comMTTL-W01_2.0.17.fwr` (historical upstream build; the image is no longer in `firmware/`. Retrieve it from this file's git history or the [upstream releases](https://github.com/af950833/mttl_w01_standalone/releases).)
 
 SHA-256: `534dae7fb9dc5d23fd70a756dbd05951aed7e7c40c97243b89fd2ee1bd327238`
 
