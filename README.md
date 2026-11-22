@@ -246,7 +246,11 @@ If a problem during a firmware update makes web OTA unavailable, see the [ST Lin
 
 ## Version History
 
-### 2.2.0 — English-only fork line (unreleased until tagged)
+### 2.2.1
+
+- Firmware page: an upload the strip rejects before writing (SHA-256 mismatch, malformed header, wrong file type) now says nothing was installed and allows an immediate retry, instead of "Result uncertain".
+
+### 2.2.0 — English-only fork line
 
 - English-only dashboard, Windows builder and recovery tool; smaller device UI (more free RAM before the stack reserve).
 - Optional `X-MTTL-SHA256` upload check: the device compares the raw FWR SHA-256 with the expected value before activation.
