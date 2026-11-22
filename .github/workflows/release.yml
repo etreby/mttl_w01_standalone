@@ -77,6 +77,10 @@ jobs:
       - name: Host self-test (fixture image)
         run: source/standalone/run_host_selftest.sh
 
+      - name: Install Playwright for the Home Assistant card test
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.49.1
+          npx playwright install --with-deps chromium
       - name: Unit tests
         run: |
           set -e
