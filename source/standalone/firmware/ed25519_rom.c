@@ -50,8 +50,10 @@ extern int rom_ed25519_crypto_sign_verify_detached(const unsigned char *sig,cons
  unsigned long long mlen,const unsigned char *pk);
 static int rom_kat_state;
 int mttl_ed25519_rom_ready(void){return rom_kat_state;}
-/* Same contract as ed25519_verify.c: buf[0..63] scratch, message at buf+64. */
-int mttl_ed25519_verify(const uint8_t sig[64],const uint8_t pk[32],uint8_t *buf,size_t len){
+/* Same contract as ed25519_verify.c: buf[0..63] scratch, message at buf+64.
+ * The device's mttl_ed25519_verify() (sdk_worker.c) runs this on the worker
+ * stack: the ROM's own stack use is unknown and may exceed the httpd stack. */
+int mttl_ed25519_rom_verify(const uint8_t sig[64],const uint8_t pk[32],uint8_t *buf,size_t len){
  return buf&&mttl_ed25519_verify_with(rom_ed25519_crypto_sign_verify_detached,&rom_kat_state,sig,pk,buf+64,len);
 }
 #endif

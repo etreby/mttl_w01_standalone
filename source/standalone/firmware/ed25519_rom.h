@@ -13,5 +13,6 @@ int mttl_ed25519_verify_with(mttl_ed25519_detached_fn fn,int *kat_state,const ui
  const uint8_t pk[32],const uint8_t *msg,size_t len);
 #ifdef MTTL_ED25519_ROM
 int mttl_ed25519_rom_ready(void);
+int mttl_ed25519_rom_verify(const uint8_t sig[64],const uint8_t pk[32],uint8_t *buf,size_t len);
 #endif
 #endif

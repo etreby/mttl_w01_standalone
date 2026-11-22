@@ -1,6 +1,8 @@
 #include "pull_update.h"
 #include "http_framing.h"
 #include "ed25519_verify.h"
+#include "settings.h"
+#include <stdio.h>
 #include <string.h>
 static int digit(char c){return c>='0'&&c<='9';}
 static int hexl(char c){return digit(c)||(c>='a'&&c<='f');}
@@ -11,16 +13,16 @@ static int number(const char *s,size_t n,uint32_t max,uint32_t *out){
  *out=v;return 1;
 }
 int mttl_pull_base_parse(const char *s,uint32_t *ip,uint16_t *port){
- uint32_t a=0,part,p;unsigned k;size_t n,i;const char *q;
+ uint32_t a=0,part,p;unsigned k;size_t n;const char *q;
  if(!s||strncmp(s,"http://",7))return 0;s+=7;
  for(k=0;k<4;k++){for(n=0;digit(s[n]);n++){}if(!number(s,n,255,&part))return 0;a=(a<<8)|part;s+=n;if(*s++!=(k<3?'.':':'))return 0;}
  for(n=0;digit(s[n]);n++){}if(!number(s,n,65535,&p)||!p)return 0;q=s+n;
  if(*q=='/')q++;if(*q)return 0;
- i=a>>24;if(!(i==10||(i==172&&((a>>16)&255)>=16&&((a>>16)&255)<=31)||(i==192&&((a>>16)&255)==168)))return 0;
+ if(!mttl_settings_pull_valid(a,(uint16_t)p))return 0;
  *ip=a;*port=(uint16_t)p;return 1;
 }
-static size_t put(char *o,size_t at,size_t cap,const char *s,size_t n){if(at+n>=cap)return cap;memcpy(o+at,s,n);return at+n;}
-static size_t dec(char *o,size_t at,size_t cap,uint32_t v){char t[10];unsigned n=0;do{t[9-n++]=(char)('0'+v%10u);v/=10u;}while(v);return put(o,at,cap,t+10-n,n);}
+/* snprintf result as a length, 0 when it did not fit (fails closed). */
+static size_t fit(int n,size_t cap){return n>0&&(size_t)n<cap?(size_t)n:0;}
 static int path_ok(const char *p,size_t n){
  size_t i;if(!n||n>MTTL_PULL_URL_MAX||p[0]!='/')return 0;
  for(i=0;i<n;i++){char c=p[i];if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||digit(c)||c=='.'||c=='_'||c=='~'||c=='-'||c=='/'))return 0;
@@ -28,11 +30,9 @@ static int path_ok(const char *p,size_t n){
  return 1;
 }
 size_t mttl_pull_request(char *o,size_t cap,uint32_t ip,uint16_t port,const char *path){
- size_t at=0;unsigned k;if(!o||!path||!path_ok(path,strlen(path)))return 0;
- at=put(o,at,cap,"GET ",4);at=put(o,at,cap,path,strlen(path));at=put(o,at,cap," HTTP/1.0\r\nHost: ",17);
- for(k=0;k<4;k++){at=dec(o,at,cap,(ip>>(24-8*k))&255u);at=put(o,at,cap,k<3?".":":",1);}
- at=dec(o,at,cap,port);at=put(o,at,cap,"\r\nAccept: */*\r\nConnection: close\r\n\r\n",37);
- if(at>=cap)return 0;o[at]=0;return at;
+ if(!o||!path||!path_ok(path,strlen(path)))return 0;
+ return fit(snprintf(o,cap,"GET %s HTTP/1.0\r\nHost: %u.%u.%u.%u:%u\r\nAccept: */*\r\nConnection: close\r\n\r\n",path,
+  (unsigned)(ip>>24),(unsigned)((ip>>16)&255),(unsigned)((ip>>8)&255),(unsigned)(ip&255),(unsigned)port),cap);
 }
 int mttl_pull_response_head(const uint8_t *p,size_t n,uint32_t *length){
  const uint8_t *v;size_t vn;uint32_t len;
@@ -60,15 +60,8 @@ int mttl_pull_version(const char *s,size_t n,uint16_t out[3]){
 }
 int mttl_pull_version_newer(const uint16_t a[3],const uint16_t b[3]){unsigned k;for(k=0;k<3;k++)if(a[k]!=b[k])return a[k]>b[k];return 0;}
 size_t mttl_pull_canonical(const mttl_pull_manifest *m,char *o,size_t cap){
- size_t at=0;unsigned k;
- at=put(o,at,cap,"{\"build_id\":\"",13);at=put(o,at,cap,m->build_id,16);
- at=put(o,at,cap,"\",\"expires_at\":",15);at=dec(o,at,cap,m->expires_at);
- at=put(o,at,cap,",\"sha256\":\"",11);at=put(o,at,cap,m->sha256,64);
- at=put(o,at,cap,"\",\"size\":",9);at=dec(o,at,cap,m->size);
- at=put(o,at,cap,",\"url\":\"",8);at=put(o,at,cap,m->url,strlen(m->url));
- at=put(o,at,cap,"\",\"version\":\"",13);
- for(k=0;k<3;k++){at=dec(o,at,cap,m->version[k]);if(k<2)at=put(o,at,cap,".",1);}
- at=put(o,at,cap,"\"}",2);return at>=cap?0:at;
+ return fit(snprintf(o,cap,"{\"build_id\":\"%s\",\"expires_at\":%lu,\"sha256\":\"%s\",\"size\":%lu,\"url\":\"%s\",\"version\":\"%u.%u.%u\"}",
+  m->build_id,(unsigned long)m->expires_at,m->sha256,(unsigned long)m->size,m->url,(unsigned)m->version[0],(unsigned)m->version[1],(unsigned)m->version[2]),cap);
 }
 static const char *const keys[7]={"build_id","expires_at","sha256","signature","size","url","version"};
 static size_t ws(const char *s,size_t i,size_t n){while(i<n&&(s[i]==' '||s[i]=='\t'||s[i]=='\r'||s[i]=='\n'))i++;return i;}

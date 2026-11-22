@@ -106,3 +106,48 @@ print(urllib.request.urlopen(request, timeout=180).read().decode())
 ```
 
 Success responses are `{"written":true,"activated":true,"rebooting":true}` (optionally with `restore_version`) or `{"already_installed":true,"activated":false,"rebooting":false}`.
+
+## Pull update: /api/pull/*
+
+Opt-in update from a LAN OTA server with an Ed25519-signed manifest (OTA
+firmware only; contract in [PULL_UPDATE_EN.md](PULL_UPDATE_EN.md)). Nothing is
+checked or installed without one of the POSTs below. Every POST needs
+`Origin: http://<current IPv4 address>`, like the other POSTs.
+
+| Request | Body | Result |
+|---|---|---|
+| `GET /api/pull/status` | — | Status JSON (below) |
+| `POST /api/pull/base` | empty (disable), or 6 bytes: IPv4 then port, both big endian | `200 {"accepted":true,"pending":true}`; the worker saves it to flash. `400` unless 0 or 6 bytes, or not an RFC 1918 address with a non-zero port; `429` while busy |
+| `POST /api/pull/check` | empty | Fetches `GET /v1/device/manifest` (≤ 15 s), verifies it and returns the status JSON. `429` when no server is set or a check/install is running |
+| `POST /api/pull/install` | the 16 hex `build_id` shown by the last check | `200 {"accepted":true,"pending":true}` is sent **before** the download; the device then downloads, verifies and activates the image and reboots (≤ 180 s + reboot). `400` when nothing matching and unexpired is on offer |
+
+During a check or install the device answers other HTTP requests only after
+it finishes. After an install, poll `GET /api/firmware/status` until
+`build_id` changes; if the device answers with the old `build_id`, read
+`GET /api/pull/status` for the error (no automatic retry).
+
+`GET /api/config` includes `"pull_base":"http://192.168.0.10:8080"` (`""` when
+disabled). `POST /api/config` bodies never change it.
+
+Status JSON:
+
+```json
+{"state":3,"error":0,"rom_ready":1,"version":"2.2.0","build_id":"0123456789abcdef","size":434000,"sha256":"…64 hex…","expires_at":1900000000}
+```
+
+`state` and `error` are numeric (table in
+[PULL_UPDATE_EN.md](PULL_UPDATE_EN.md#device-check-order)). `rom_ready` is the
+signature verifier's one-time self-test: 0 not run yet, 1 passed, -1 failed
+(then every check fails with `signature`). The offered fields appear only for a
+manifest whose signature verified.
+
+```python
+import json, urllib.request
+base = 'http://192.168.0.153'
+def post(path, body=b''):
+    return urllib.request.urlopen(urllib.request.Request(base + path, data=body, method='POST', headers={'Origin': base}), timeout=30).read()
+post('/api/pull/base', bytes([192, 168, 0, 10]) + (8080).to_bytes(2, 'big'))
+offer = json.loads(post('/api/pull/check'))
+print(offer)  # install only after reviewing it:
+# post('/api/pull/install', offer['build_id'].encode())
+```

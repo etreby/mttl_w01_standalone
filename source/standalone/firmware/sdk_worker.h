@@ -22,6 +22,9 @@ void mttl_sdk_status_snapshot(mttl_worker_status *status);
 size_t mttl_sdk_device_json(char *,size_t,int settings);
 int mttl_sdk_config_reserve(const uint8_t *,size_t,int keep_password);
 void mttl_sdk_config_release(int accepted);
+/* Opt-in pull-update server (0/0 = disabled); a change is saved by the worker. */
+void mttl_sdk_pull_base(uint32_t *ip,uint16_t *port);
+int mttl_sdk_pull_base_request(uint32_t ip,uint16_t port);
 int mttl_sdk_control_request(unsigned channel,unsigned on);
 void mttl_sdk_control_timing(uint32_t out[4]);
 uint32_t mttl_sdk_relay_snapshot(void);

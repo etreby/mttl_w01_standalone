@@ -10,7 +10,12 @@
 #include "lwip_netconf.h"
 #endif
 extern struct netif xnetif[];
+#ifdef MTTL_SDK_WIFI_TEST
 static mttl_scan scan_cache;
+#else
+/* TCM (.mttl.cache, zeroed in setup()) keeps main RAM for the image. */
+static mttl_scan scan_cache __attribute__((section(".mttl.cache")));
+#endif
 static uint32_t scan_generation;
 static int32_t scan_diagnostics[4];
 static uint8_t network_initialized;

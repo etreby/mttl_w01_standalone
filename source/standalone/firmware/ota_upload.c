@@ -15,3 +15,10 @@ int mttl_ota_upload_verify(mttl_ota_upload *u){
  uint8_t got[32];int ok;if(!u->check)return 1;
  ok=mttl_ota_hash_finish(&u->raw,got)&&mttl_ct_equal(got,u->want,32);zero(got,32);zero(u,sizeof(*u));return ok;
 }
+int mttl_ota_upload_stream(mttl_ota_upload *u,uint32_t size,uint8_t chunk[256],int (*read)(void *,uint8_t *,size_t),void *context,
+                           int (*feed)(const uint8_t *,size_t)){
+ uint32_t done=0;
+ while(done<size){size_t take=size-done;int n;if(take>256)take=256;n=read(context,chunk,take);
+  if(n<=0||(size_t)n>take)return 0;mttl_ota_upload_chunk(u,chunk,(size_t)n);if(!feed(chunk,(size_t)n))return 0;done+=(uint32_t)n;}
+ return 1;
+}

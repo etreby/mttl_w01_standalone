@@ -109,5 +109,9 @@ size_t mttl_settings_json(const mttl_settings *s,int persistent,char *out,size_t
     n=snprintf(out,cap,"{\"device\":%s,\"channels\":[%s,%s,%s,%s],\"language\":%u,\"broker\":%s,\"port\":%u,\"user\":%s,\"topic\":%s,\"enabled\":%s,\"wifi_password_set\":%s,\"mqtt_password_set\":%s,\"persistent\":%s,\"protection\":{\"enabled\":%u,\"temperature\":%u,\"current\":%u,\"power\":%u},\"schedule_hex\":\"",device,channels[0],channels[1],channels[2],channels[3],s->language,broker,s->port,user,topic,s->mqtt_enabled?"true":"false",s->wifi_password[0]?"true":"false",s->mqtt_password[0]?"true":"false",persistent?"true":"false",(unsigned)s->protection.enabled,(unsigned)s->protection.temperature_c,(unsigned)s->protection.current_ma,(unsigned)s->protection.power_w);
     if(n<0||(size_t)n+103>=cap)return 0;used=(size_t)n;
     {uint8_t bytes[50];static const char hex[]="0123456789abcdef";mttl_schedule_pack(&s->schedule,bytes);for(i=0;i<50;i++){out[used++]=hex[bytes[i]>>4];out[used++]=hex[bytes[i]&15];}}
-    n=snprintf(out+used,cap-used,"\",\"button_lock\":%u,\"timer_minutes\":[%u,%u,%u,%u]}",(unsigned)s->button_lock,(unsigned)s->timer_minutes[0],(unsigned)s->timer_minutes[1],(unsigned)s->timer_minutes[2],(unsigned)s->timer_minutes[3]);return n>0&&(size_t)n<cap-used?used+(size_t)n:0;
+    n=snprintf(out+used,cap-used,"\",\"button_lock\":%u,\"timer_minutes\":[%u,%u,%u,%u],\"pull_base\":\"",(unsigned)s->button_lock,(unsigned)s->timer_minutes[0],(unsigned)s->timer_minutes[1],(unsigned)s->timer_minutes[2],(unsigned)s->timer_minutes[3]);
+    if(n<=0||(size_t)n>=cap-used)return 0;used+=(size_t)n;
+    /* Opt-in pull-update server, "" while disabled. */
+    n=s->pull_ip?snprintf(out+used,cap-used,"http://%u.%u.%u.%u:%u",(unsigned)(s->pull_ip>>24),(unsigned)((s->pull_ip>>16)&255),(unsigned)((s->pull_ip>>8)&255),(unsigned)(s->pull_ip&255),(unsigned)s->pull_port):0;
+    if(n<0||(size_t)n+3>cap-used)return 0;used+=(size_t)n;out[used++]='"';out[used++]='}';out[used]=0;return used;
 }

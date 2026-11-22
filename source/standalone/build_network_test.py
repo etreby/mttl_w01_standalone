@@ -50,6 +50,8 @@ def main():
     for result in (0,1):
         u=Uc(UC_ARCH_ARM,UC_MODE_THUMB);u.mem_map(0x10000000,0x100000)
         u.mem_write(0x10006000,body)
+        # TCM with garbage: setup() must zero the NOLOAD .mttl.cache section.
+        u.mem_map(0x1fff0000,0x10000);u.mem_write(0x1fff0000,b'\xa5'*0x10000)
         calls=[];stop=0x100f0000
         def hook(uc,address,size,context):
             if address==syms['mttl_sdk_worker_start']:
@@ -58,8 +60,11 @@ def main():
         u.hook_add(UC_HOOK_CODE,hook,begin=syms['mttl_sdk_worker_start'],end=syms['mttl_sdk_worker_start'])
         u.hook_add(UC_HOOK_CODE,hook,begin=stop,end=stop)
         u.reg_write(UC_ARM_REG_SP,0x100ee000);u.reg_write(UC_ARM_REG_LR,stop|1)
-        u.emu_start(syms.get('setup',syms.get('_Z5setupv'))|1,stop,count=10000)
+        u.emu_start(syms.get('setup',syms.get('_Z5setupv'))|1,stop,count=200000)
         assert u.reg_read(UC_ARM_REG_PC)==stop and len(calls)==1
+        cache=(syms['__mttl_cache_start'],syms['__mttl_cache_end']);assert 0x1fff0000<=cache[0]<cache[1]<=0x20000000
+        assert u.mem_read(cache[0],cache[1]-cache[0])==bytes(cache[1]-cache[0]),'setup() must zero .mttl.cache'
+        assert u.mem_read(cache[1],16)==b'\xa5'*16 and u.mem_read(cache[0]-16,16)==b'\xa5'*16
         assert struct.unpack('<I',u.mem_read(syms['mttl_network_start_result'],4))[0]==result
     objcopy=out/'independent-body.bin'
     args=['-O','binary']

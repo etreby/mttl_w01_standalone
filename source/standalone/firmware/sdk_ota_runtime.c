@@ -10,7 +10,8 @@
 flash_t flash;
 extern unsigned char __ram_image2_text_start__[],__data_start__[];
 static const mttl_ota_layout layout={0xb000,0x80000,0xe0000,0x100000,0x70000};
-static mttl_ota_session session;
+/* TCM (.mttl.cache, zeroed in setup()) keeps main RAM for the image. */
+static mttl_ota_session session __attribute__((section(".mttl.cache")));
 static mttl_sdk_ota_flash adapter;
 static uint32_t active;
 static uint8_t authorized;

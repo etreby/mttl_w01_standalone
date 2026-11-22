@@ -31,7 +31,10 @@ if options.ota_test:
 <div class="file-picker"><button id="firmware-picker" type="button">Choose file</button><span id="firmware-selected" class="muted" aria-live="polite"></span></div>
 <label id="ota-sha-label" for="firmware-sha"></label><input id="firmware-sha" maxlength="64" spellcheck="false" autocomplete="off">
 <div class="row"><button id="firmware-verify" type="button" hidden></button><button id="firmware-update" class="primary" disabled></button></div></form>
-<div id="firmware-status" class="status" role="status" aria-live="polite"></div><p class="muted">Download firmware only from your OTA server and compare the file SHA-256 with the value it publishes before uploading.</p></div></section>'''
+<div id="firmware-status" class="status" role="status" aria-live="polite"></div><p class="muted">Download firmware only from your OTA server and compare the file SHA-256 with the value it publishes before uploading.</p>
+<h2>OTA server</h2><label for="pull-base">URL (http://private IPv4:port; empty = off)</label><input id="pull-base" maxlength="28" spellcheck="false" autocomplete="off">
+<div class="row"><button id="pull-save" type="button">Save URL</button><button id="pull-check" type="button" disabled>Check for update</button><button id="pull-install" type="button" class="primary" hidden>Install</button></div>
+<div id="pull-status" class="status" role="status" aria-live="polite"></div></div></section>'''
     html,count=re.subn(r'<section id="firmware".*?</section>',lambda _:panel,html,flags=re.S)
     assert count==1,'Missing firmware panel'
     # OTA initialization is bundled with the common controller below: it cannot
