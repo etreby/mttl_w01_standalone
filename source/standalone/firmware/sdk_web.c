@@ -13,7 +13,12 @@
 #include "sys_api.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "pull_client.h"
+#include "pull_key.h"
+#include "ed25519_rom.h"
+#include "settings.h"
 extern void mttl_http_ota_budget(struct httpd_conn *);
+extern const mttl_pull_io mttl_sdk_pull_io;
 #endif
 static int started;
 static void ota_redirect(struct httpd_conn *c){
@@ -55,10 +60,14 @@ static void hex_ssid(const char *ssid,char hex[65]){unsigned i;static const char
 static union {char json[1792];uint8_t settings[1024];
 #ifdef MTTL_OTA_TEST
  mttl_ota_upload upload;
+ /* Pull install: shared decoder state plus response head, then 256-byte chunks. */
+ struct {mttl_ota_upload upload;uint8_t io[MTTL_PULL_HEAD_MAX];} install;
+ uint8_t check[MTTL_PULL_CHECK_WORK];
 #endif
 } http_scratch __attribute__((section(".mttl.cache")));
 #define json http_scratch.json
 static int origin_ok(struct httpd_conn *c);
+static const char pending_json[]="{\"accepted\":true,\"pending\":true}";
 static void control_page(struct httpd_conn *c){uint8_t body[2];size_t n=0;
  if(httpd_request_is_method(c,"GET")){uint32_t t[4];int length;mttl_sdk_control_timing(t);length=snprintf(json,sizeof(json),"{\"sequence\":%lu,\"wait_ms\":%lu,\"run_ms\":%lu,\"busy\":%lu}",(unsigned long)t[0],(unsigned long)t[1],(unsigned long)t[2],(unsigned long)t[3]);if(length>0&&(size_t)length<sizeof(json))response(c,json,length,"application/json");else httpd_conn_close(c);return;}
  if(!httpd_request_is_method(c,"POST")){httpd_response_method_not_allowed(c,0);goto close;}
@@ -79,7 +88,7 @@ static void config_page(struct httpd_conn *c){
     if(!accepted||!c->request.content_len||c->request.content_len>sizeof(http_scratch.settings)){httpd_response_bad_request(c,"Invalid settings body");httpd_conn_close(c);return;}accepted=0;
     while(used<c->request.content_len){int count=httpd_request_read_data(c,body+used,c->request.content_len-used);if(count<=0||(size_t)count>c->request.content_len-used)goto close;used+=(size_t)count;}
     {char *keep=0;int preserve;httpd_request_get_header_field(c,"X-MTTL-Keep-Password",&keep);preserve=keep&&!strcmp(keep,"1");if(keep)httpd_free(keep);if(!mttl_sdk_config_reserve(body,used,preserve)){httpd_response_bad_request(c,"Invalid settings or not ready");goto close;}}
-    {static const char response[]="{\"accepted\":true,\"pending\":true}";if(httpd_response_write_header_start(c,"202 Accepted","application/json",sizeof(response)-1)>=0&&httpd_response_write_header(c,"Connection","close")>=0&&httpd_response_write_header(c,"Cache-Control","no-store")>=0&&httpd_response_write_header_finish(c)>=0&&httpd_response_write_data(c,(uint8_t *)response,sizeof(response)-1)==sizeof(response)-1)accepted=1;}
+    {const char *response=pending_json;if(httpd_response_write_header_start(c,"202 Accepted","application/json",sizeof(pending_json)-1)>=0&&httpd_response_write_header(c,"Connection","close")>=0&&httpd_response_write_header(c,"Cache-Control","no-store")>=0&&httpd_response_write_header_finish(c)>=0&&httpd_response_write_data(c,(uint8_t *)response,sizeof(pending_json)-1)==sizeof(pending_json)-1)accepted=1;}
     httpd_conn_close(c);mttl_sdk_config_release(accepted);goto wipe;
 close:httpd_conn_close(c);
 wipe:{volatile uint8_t *p=body;for(n=0;n<sizeof(http_scratch.settings);n++)p[n]=0;}
@@ -147,31 +156,100 @@ static int ota_access(struct httpd_conn *c){
     httpd_request_get_header_field(c,"Origin",&value);ok=value&&!strcmp(value,wanted);if(value)httpd_free(value);if(!ok)return 0;
     return ok;
 }
+/* One install path for POST /api/firmware/upload and the pull install:
+ * hold the owner, verify geometry/running slot, stream through the shared
+ * decoder into the OTA session, compare the raw-file SHA-256, activate.
+ * 1 activated (caller reboots), 2 identical image, <0 failure stage. */
+static int ota_install(mttl_ota_upload *u,uint32_t size,int (*read)(void *,uint8_t *,size_t),void *source,uint8_t chunk[256]){
+    uint8_t expected[32]={0};int finished;
+    mttl_sdk_sse_close(); /* Reclaim stream buffer before flash workspace. */
+    /* Drain an in-flight pulse and hold its owner BEFORE any OTA flash write. */
+    if(!mttl_sdk_energy_barrier())return -1;
+    if(!mttl_sdk_ota_begin(size,expected)){mttl_sdk_energy_release();return -2;}
+    if(!mttl_ota_upload_stream(u,size,chunk,read,source,mttl_sdk_ota_feed))goto fail;
+    /* Compare the published digest before mttl_sdk_ota_finish() can activate. */
+    if(!mttl_ota_upload_verify(u)){mttl_sdk_energy_release();mttl_sdk_ota_abort();return -4;}
+    finished=mttl_sdk_ota_finish();if(!finished)goto fail;
+    if(finished==2)mttl_sdk_energy_release();
+    return finished;
+fail:mttl_sdk_energy_release();mttl_sdk_ota_abort();return -3;
+}
+static int upload_read(void *c,uint8_t *b,size_t n){return httpd_request_read_data(c,b,n);}
+static void reboot(void){vTaskDelay(1000/portTICK_RATE_MS+1);sys_reset();}
 static void ota_upload(struct httpd_conn *c){
-    uint8_t expected[32]={0},chunk[256];uint32_t received=0;char *value=0;int ok;mttl_ota_upload *u=&http_scratch.upload;
+    uint8_t chunk[256];char *value=0;int ok;mttl_ota_upload *u=&http_scratch.upload;
     if(!httpd_request_is_method(c,"POST")){httpd_response_method_not_allowed(c,0);goto close;}
     if(!ota_access(c)){httpd_response_bad_request(c,"Same-origin required");goto close;}
     value=0;httpd_request_get_header_field(c,"Content-Type",&value);ok=value&&!strcmp(value,"application/x-mttl-fwr");if(value)httpd_free(value);if(!ok){httpd_response_bad_request(c,"FWR required");goto close;}
     /* Optional published digest of the raw .fwr; validated before any erase. */
     value=0;httpd_request_get_header_field(c,"X-MTTL-SHA256",&value);ok=mttl_ota_upload_begin(u,value);if(value)httpd_free(value);if(!ok){httpd_response_bad_request(c,"Malformed X-MTTL-SHA256; no write");goto close;}
     mttl_http_ota_budget(c);
-    mttl_sdk_sse_close(); /* Reclaim stream buffer before flash workspace. */
-    /* Drain an in-flight pulse and hold its owner BEFORE any OTA flash write. */
-    if(!mttl_sdk_energy_barrier()){httpd_response_bad_request(c,"Owner checkpoint/hold failed");goto close;}
-    if(!mttl_sdk_ota_begin(c->request.content_len,expected)){mttl_sdk_energy_release();httpd_response_bad_request(c,"Geometry or unique running slot not verified; no write");goto close;}
-    while(received<c->request.content_len){size_t take=c->request.content_len-received;int n;if(take>sizeof(chunk))take=sizeof(chunk);n=httpd_request_read_data(c,chunk,take);if(n<=0||(size_t)n>take)goto fail;mttl_ota_upload_chunk(u,chunk,(size_t)n);if(!mttl_sdk_ota_feed(chunk,n))goto fail;received+=(uint32_t)n;}
-    /* Compare the published digest before mttl_sdk_ota_finish() can activate. */
-    if(!mttl_ota_upload_verify(u)){mttl_sdk_energy_release();mttl_sdk_ota_abort();httpd_response_bad_request(c,"SHA-256 mismatch; nothing activated");goto close;}
-    {int finished=mttl_sdk_ota_finish();if(!finished)goto fail;
-     if(finished==2){static const char same[]="{\"already_installed\":true,\"activated\":false,\"rebooting\":false}";mttl_sdk_energy_release();response(c,same,sizeof(same)-1,"application/json");goto close;}}
+    switch(ota_install(u,c->request.content_len,upload_read,c,chunk)){
+     case -1:httpd_response_bad_request(c,"Owner checkpoint/hold failed");goto close;
+     case -2:httpd_response_bad_request(c,"Geometry or unique running slot not verified; no write");goto close;
+     case -4:httpd_response_bad_request(c,"SHA-256 mismatch; nothing activated");goto close;
+     case 2:{static const char same[]="{\"already_installed\":true,\"activated\":false,\"rebooting\":false}";response(c,same,sizeof(same)-1,"application/json");goto close;}
+     case 1:break;
+     default:httpd_response_bad_request(c,"OTA failed; checkpoint or image activation not completed");goto close;
+    }
     {static const char done[]="{\"written\":true,\"activated\":true,\"rebooting\":true}";
      static const char stock[]="{\"written\":true,\"activated\":true,\"rebooting\":true,\"restore_version\":\"1.0.66\"}";
      static const char local[]="{\"written\":true,\"activated\":true,\"rebooting\":true,\"restore_version\":\"1.0.68\"}";
      int version=mttl_sdk_ota_restore_version();if(version==66)response(c,stock,sizeof(stock)-1,"application/json");else if(version==68)response(c,local,sizeof(local)-1,"application/json");else response(c,done,sizeof(done)-1,"application/json");}
-    vTaskDelay(1000/portTICK_RATE_MS+1);sys_reset();return;
-fail:mttl_sdk_energy_release();mttl_sdk_ota_abort();httpd_response_bad_request(c,"OTA failed; checkpoint or image activation not completed");
+    reboot();return;
 close:httpd_conn_close(c);
 }
+/* Opt-in pull update (docs/PULL_UPDATE_EN.md). httpd thread only: the state,
+ * socket and OTA session have this single owner; nothing runs from timers. */
+/* TCM like http_scratch (NOLOAD, not zeroed): cleared in mttl_sdk_web_start. */
+static mttl_pull pull __attribute__((section(".mttl.cache")));
+static uint32_t pull_ip;static uint16_t pull_port;
+/* A changed or cleared server invalidates anything verified from the old one. */
+static void pull_sync(void){uint32_t ip;uint16_t port;mttl_sdk_pull_base(&ip,&port);
+    if(ip!=pull_ip||port!=pull_port||(pull.state==MTTL_PULL_DISABLED)!=!ip){pull_ip=ip;pull_port=port;mttl_pull_init(&pull,ip!=0);}}
+static void pull_reply(struct httpd_conn *c){size_t n=mttl_pull_status_json(&pull,mttl_ed25519_rom_ready(),json,sizeof(json));
+    if(n)response(c,json,n,"application/json");else{httpd_response_internal_server_error(c,0);httpd_conn_close(c);}}
+static void pull_status(struct httpd_conn *c){pull_sync();if(httpd_request_is_method(c,"GET"))pull_reply(c);else{httpd_response_method_not_allowed(c,0);httpd_conn_close(c);}}
+/* Small same-origin POST body: length+1, or 0 when refused/unreadable. */
+static size_t pull_body(struct httpd_conn *c,char *out,size_t cap){size_t used=0;
+    if(!httpd_request_is_method(c,"POST")){httpd_response_method_not_allowed(c,0);return 0;}
+    if(!origin_ok(c)){httpd_response_bad_request(c,"Same-origin required");return 0;}
+    if(c->request.content_len>=cap){httpd_response_bad_request(c,0);return 0;}
+    while(used<c->request.content_len){int n=httpd_request_read_data(c,(uint8_t *)out+used,c->request.content_len-used);if(n<=0||(size_t)n>c->request.content_len-used)return 0;used+=(size_t)n;}
+    out[used]=0;return used+1;}
+/* Body: empty (disable) or 6 bytes, IPv4 then port, both big endian. The
+ * dashboard parses the URL; the RFC 1918/port rule is enforced here again. */
+static void pull_base(struct httpd_conn *c){uint8_t b[7];uint32_t ip;uint16_t port;size_t n=pull_body(c,(char *)b,sizeof(b));
+    if(!n)goto close;
+    ip=(uint32_t)b[0]<<24|(uint32_t)b[1]<<16|(uint32_t)b[2]<<8|b[3];port=(uint16_t)(b[4]<<8|b[5]);if(n==1)ip=port=0;
+    if((n!=1&&n!=7)||!mttl_settings_pull_valid(ip,port)){httpd_response_bad_request(c,0);goto close;}
+    if(!mttl_sdk_pull_base_request(ip,port)){httpd_response_too_many_requests(c,"Not ready or busy");goto close;}
+    response(c,pending_json,sizeof(pending_json)-1,"application/json");return;
+close:httpd_conn_close(c);}
+static void pull_check(struct httpd_conn *c){char body[1];mttl_worker_status status;static const uint8_t key[32]=MTTL_PULL_PUBLIC_KEY;static const uint16_t current[3]={2,1,1};
+    if(!pull_body(c,body,sizeof(body)))goto close;
+    pull_sync();mttl_sdk_status_snapshot(&status);
+    mttl_http_ota_budget(c); /* 15 s manifest limit, then the reply */
+    if(!mttl_pull_check_run(&pull,&mttl_sdk_pull_io,pull_ip,pull_port,key,(uint32_t)(status.unix_ms/1000u),status.time_valid,current,http_scratch.check)){
+     httpd_response_too_many_requests(c,"Not ready or busy");goto close;}
+    pull_reply(c);return;
+close:httpd_conn_close(c);}
+/* Body: the 16-hex build_id the dashboard displayed. The reply is sent before
+ * the download; the result is the reboot or GET /api/pull/status. */
+static void pull_install(struct httpd_conn *c){char body[17];mttl_worker_status status;mttl_pull_conn conn;uint32_t length;int r;
+    if(!pull_body(c,body,sizeof(body)))goto close;
+    pull_sync();mttl_sdk_status_snapshot(&status);
+    if(!mttl_pull_install_begin(&pull,body,(uint32_t)(status.unix_ms/1000u),status.time_valid)){httpd_response_bad_request(c,0);goto close;}
+    response(c,pending_json,sizeof(pending_json)-1,"application/json");
+    r=mttl_pull_get(&conn,&mttl_sdk_pull_io,pull_ip,pull_port,pull.manifest.url,MTTL_PULL_IMAGE_MS,http_scratch.install.io,&length);
+    if(r==MTTL_PULL_OK&&length!=pull.manifest.size)r=MTTL_PULL_E_SIZE;
+    /* Always compare the raw .fwr against the signed sha256 before activation. */
+    if(r==MTTL_PULL_OK&&!mttl_ota_upload_begin(&http_scratch.install.upload,pull.manifest.sha256))r=MTTL_PULL_E_MALFORMED;
+    if(r==MTTL_PULL_OK){r=ota_install(&http_scratch.install.upload,length,mttl_pull_read,&conn,http_scratch.install.io);
+     if(r==1){mttl_pull_close(&conn);reboot();return;}
+     r=r==-4?MTTL_PULL_E_DIGEST:r==2?MTTL_PULL_E_NOT_NEWER:MTTL_PULL_E_INSTALL;}
+    mttl_pull_close(&conn);mttl_pull_install_failed(&pull,r);return;
+close:httpd_conn_close(c);}
 #endif
 static void configure(struct httpd_conn *c){
     unsigned char body[321];char ssid[33],password[65];size_t received=0;int accepted=0;
@@ -205,20 +283,26 @@ clear_only:
 close:
     httpd_conn_close(c);goto clear_only;
 }
+static const struct {const char *path;void (*callback)(struct httpd_conn *);} pages[]={
+#ifdef MTTL_OTA_TEST
+    {"/ota",ota_redirect},{"/api/firmware/status",ota_status},{"/api/firmware/upload",ota_upload},
+    {"/api/pull/status",pull_status},{"/api/pull/check",pull_check},{"/api/pull/install",pull_install},{"/api/pull/base",pull_base},
+#endif
+    {"/api/control",control_page},{"/api/events",mttl_sdk_sse_open},{"/api/device",device_page},{"/api/config",config_page},{"/api/version",info},
+    {"/api/wifi",configure},{"/api/status",status_page},{"/api/scan",scan_page},{"/api/memory",memory_page},{"/api/energy",energy_page}};
 int mttl_sdk_web_start(void){
     unsigned i;
     if(started)return 1;
     if(!mttl_httpd_stopped())return 0;
-    httpd_setup_debug(HTTPD_DEBUG_OFF);
 #ifdef MTTL_OTA_TEST
-    if(httpd_reg_page_callback("/ota",ota_redirect)<0||httpd_reg_page_callback("/api/firmware/status",ota_status)<0||httpd_reg_page_callback("/api/firmware/upload",ota_upload)<0){httpd_clear_page_callbacks();return 0;}
+    memset(&pull,0,sizeof(pull));pull_ip=pull_port=0;
 #endif
-    if(httpd_reg_page_callback("/api/control",control_page)<0){httpd_clear_page_callbacks();return 0;}
-    if(httpd_reg_page_callback("/api/events",mttl_sdk_sse_open)<0){httpd_clear_page_callbacks();return 0;}
-    for(i=0;i<sizeof(mttl_assets)/sizeof(mttl_assets[0]);i++)if(httpd_reg_page_callback((char *)mttl_assets[i].path,asset)<0){httpd_clear_page_callbacks();return 0;}
-    if(httpd_reg_page_callback("/api/device",device_page)<0 || httpd_reg_page_callback("/api/config",config_page)<0 || httpd_reg_page_callback("/api/version",info)<0 || httpd_reg_page_callback("/api/wifi",configure)<0 || httpd_reg_page_callback("/api/status",status_page)<0 || httpd_reg_page_callback("/api/scan",scan_page)<0 || httpd_reg_page_callback("/api/memory",memory_page)<0 || httpd_reg_page_callback("/api/energy",energy_page)<0){httpd_clear_page_callbacks();return 0;}
-    if(httpd_start(80,2,4096,HTTPD_THREAD_SINGLE,HTTPD_SECURE_NONE)<0){httpd_clear_page_callbacks();return 0;}
+    httpd_setup_debug(HTTPD_DEBUG_OFF);
+    for(i=0;i<sizeof(pages)/sizeof(pages[0]);i++)if(httpd_reg_page_callback((char *)pages[i].path,pages[i].callback)<0)goto fail;
+    for(i=0;i<sizeof(mttl_assets)/sizeof(mttl_assets[0]);i++)if(httpd_reg_page_callback((char *)mttl_assets[i].path,asset)<0)goto fail;
+    if(httpd_start(80,2,4096,HTTPD_THREAD_SINGLE,HTTPD_SECURE_NONE)<0)goto fail;
     started=1;return 1;
+fail:httpd_clear_page_callbacks();return 0;
 }
 void mttl_sdk_web_stop(void){if(started){httpd_stop();started=0;}}
 int mttl_sdk_web_stopped(void){return mttl_httpd_stopped();}

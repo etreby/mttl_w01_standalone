@@ -34,7 +34,9 @@ common += ['-DMTTL_HEAP_CEILING=0x1006F000',f'-DMTTL_RESERVE_BYTES={args.reserve
 if args.standalone: common += ['-I'+str(out),'-DMTTL_PRESERVE_IMAGE1_RAM=1']
 if args.network_test:
  common += ['-DMTTL_NETWORK_TEST=1','-I'+str(ROOT/'standalone/results/sdk')]
-if args.ota_test: common += ['-DMTTL_OTA_TEST=1']
+# Pull update (OTA profile only): Ed25519 through the mask-ROM verifier; the
+# TweetNaCl reference (ed25519_verify.c) is host-only and never linked here.
+if args.ota_test: common += ['-DMTTL_OTA_TEST=1','-DMTTL_ED25519_ROM']
 if args.sensor_test: common += ['-DMTTL_SENSOR_TEST=1']
 if args.relay_test: common += ['-DMTTL_RELAY_TEST=1']
 sources=[ROOT/'analysis/minimal_network_link.cpp',ROOT/'analysis/bounded_sbrk.c',ROOT/'analysis/http_only_adapter.c',ROOT/'analysis/newlib_scheduler_guard.c',hw/'variants/rtl8710/variant.cpp']
@@ -44,6 +46,8 @@ if args.standalone:
  if args.ota_test:
   sources[-1]=ROOT/'standalone/firmware/sdk_test_heap.c'
   sources.append(ROOT/'standalone/firmware/sdk_ota_runtime.c')
+  for name in ('pull_update','pull_client','ed25519_rom','sdk_pull'):
+   sources.append(ROOT/'standalone/firmware'/(name+'.c'))
  sources.append(ROOT/'standalone/firmware/core.c')
  sources.append(ROOT/'standalone/firmware/ota_guard.c')
  sources.append(ROOT/'standalone/firmware/ota_stream.c')

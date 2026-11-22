@@ -7,6 +7,9 @@
 #include "pull_update.h"
 #include "ed25519_rom.h"
 #include "pull_key.h"
+#include "pull_client.h"
+#include "pull_io_mock.h"
+#include <stdio.h>
 #include <string.h>
 extern unsigned mttl_test_count,mttl_test_failed,mttl_failed_ids[64];
 static void check(int ok){++mttl_test_count;if(!ok&&mttl_test_failed<64)mttl_failed_ids[mttl_test_failed++]=mttl_test_count;}
@@ -55,8 +58,9 @@ static void rom_wrapper_test(void){
   state=1;check(mttl_ed25519_verify_with(always_valid,&state,high,pk,msg,0)==0);} /* S >= L rejected before the ROM */
  check(key[0]==0xd3&&key[31]==0xbd&&sizeof(key)==32);
 }
+static void pull_client_test(void);
 void mttl_pull_test(void){
- rom_wrapper_test();
+ rom_wrapper_test();pull_client_test();
  uint8_t pk[32],sig[64],digest[64],want[64];size_t i,n;mttl_pull_manifest m,m2;mttl_pull st;uint32_t ip,len;uint16_t port,ver[3];char req[MTTL_PULL_CANONICAL_MAX];
  /* SHA-512("abc") (FIPS 180-2) and the RFC 8032 positive vectors. */
  mttl_sha512(digest,(const uint8_t *)"abc",3);unhex("ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f",want);check(!memcmp(digest,want,64));
@@ -147,4 +151,69 @@ void mttl_pull_test(void){
  check(mttl_pull_check_begin(&st));mttl_pull_check_done(&st,MTTL_PULL_E_NOT_NEWER,0);check(st.state==MTTL_PULL_CURRENT);
  check(mttl_pull_check_begin(&st));mttl_pull_check_done(&st,MTTL_PULL_E_SIGNATURE,0);check(st.state==MTTL_PULL_FAILED&&st.error==MTTL_PULL_E_SIGNATURE&&!st.manifest.size);
  mttl_pull_check_done(&st,MTTL_PULL_OK,&m);check(st.state==MTTL_PULL_FAILED); /* stale completion ignored */
+}
+
+/* HTTP client over a scripted socket: framing, limits, deadlines, check flow. */
+static char response_buf[4096];
+static size_t respond(const char *head_extra,const char *body,long length){ /* length<0: omit Content-Length */
+ int n=length<0?snprintf(response_buf,sizeof(response_buf),"HTTP/1.0 200 OK\r\n%s\r\n%s",head_extra,body):
+  snprintf(response_buf,sizeof(response_buf),"HTTP/1.0 200 OK\r\nContent-Type: application/json\r\n%sContent-Length: %ld\r\n\r\n%s",head_extra,length,body);
+ return (size_t)n;
+}
+static int run_check(mttl_pull *st,const char *raw,size_t n,size_t chunk,mttl_pull_mock *m,int time_valid){
+ static uint8_t work[MTTL_PULL_CHECK_WORK];mttl_pull_io io;uint8_t pk[32];static const uint16_t current[3]={2,1,1};
+ unhex(rfc[0].pk,pk);mttl_pull_mock_init(m,&io,(const uint8_t *)raw,n,chunk);
+ return mttl_pull_check_run(st,&io,0xc0a8000au,8080,pk,1800000000u,time_valid,current,work);
+}
+static void pull_client_test(void){
+ mttl_pull st;mttl_pull_mock m;size_t n,k;char json[400];static const size_t chunks[]={1,7,4096};
+ static const char want_json[]="{\"state\":3,\"error\":0,\"rom_ready\":1,\"version\":\"2.2.0\",\"build_id\":\"0123456789abcdef\",\"size\":1000,\"sha256\":\"b12c11491e1daad0b7e1cc36adabe9c9cbc1de3d04243bf06af3270a0d6f7cf2\",\"expires_at\":1900000000}";
+ /* Disabled (no server): no socket is ever opened. */
+ mttl_pull_init(&st,0);n=respond("",m_ok,(long)strlen(m_ok));check(!run_check(&st,response_buf,n,0,&m,1)&&!m.opened&&st.state==MTTL_PULL_DISABLED);
+ check(mttl_pull_status_json(&st,0,json,sizeof(json))&&!strcmp(json,"{\"state\":0,\"error\":0,\"rom_ready\":0}"));
+ /* Valid signed manifest under any chunking; exact request; 5 s connect limit. */
+ for(k=0;k<3;k++){mttl_pull_init(&st,1);check(run_check(&st,response_buf,n,chunks[k],&m,1)&&st.state==MTTL_PULL_AVAILABLE&&st.manifest.size==1000&&!strcmp(st.manifest.build_id,"0123456789abcdef"));
+  check(m.opened==1&&m.closed>=1&&m.ip==0xc0a8000au&&m.port==8080&&m.open_ms==MTTL_PULL_CONNECT_MS&&m.sent_n==93&&!memcmp(m.sent,"GET /v1/device/manifest HTTP/1.0\r\nHost: 192.168.0.10:8080\r\nAccept: */*\r\nConnection: close\r\n\r\n",93));}
+ check(mttl_pull_status_json(&st,1,json,sizeof(json))==strlen(want_json)&&!strcmp(json,want_json));
+ check(!mttl_pull_status_json(&st,1,json,strlen(want_json))&&mttl_pull_status_json(&st,1,json,strlen(want_json)+1));
+ check(mttl_pull_status_json(&st,-1,json,sizeof(json))&&strstr(json,"\"rom_ready\":-1"));
+ /* Bytes after Content-Length are never read into the manifest. */
+ {static char extra[1200];strcpy(extra,m_ok);strcat(extra,"garbage");n=respond("",extra,(long)strlen(m_ok));mttl_pull_init(&st,1);check(run_check(&st,response_buf,n,0,&m,1)&&st.state==MTTL_PULL_AVAILABLE);}
+ /* Redirects are refused and never followed (one connection only). */
+ n=(size_t)snprintf(response_buf,sizeof(response_buf),"HTTP/1.1 302 Found\r\nLocation: http://10.0.0.9:80/x\r\nContent-Length: 0\r\n\r\n");
+ mttl_pull_init(&st,1);run_check(&st,response_buf,n,0,&m,1);check(st.state==MTTL_PULL_FAILED&&st.error==MTTL_PULL_E_REDIRECT&&m.opened==1);
+ check(mttl_pull_status_json(&st,1,json,sizeof(json))&&!strcmp(json,"{\"state\":5,\"error\":8,\"rom_ready\":1}"));
+ /* Framing: chunked, missing length, oversized body, short body, huge head. */
+ n=respond("Transfer-Encoding: chunked\r\n",m_ok,(long)strlen(m_ok));mttl_pull_init(&st,1);run_check(&st,response_buf,n,0,&m,1);check(st.error==MTTL_PULL_E_HTTP);
+ n=respond("",m_ok,-1);mttl_pull_init(&st,1);run_check(&st,response_buf,n,0,&m,1);check(st.state==MTTL_PULL_FAILED&&st.error==MTTL_PULL_E_HTTP);
+ n=respond("",m_ok,1025);mttl_pull_init(&st,1);run_check(&st,response_buf,n,0,&m,1);check(st.error==MTTL_PULL_E_HTTP&&m.at<n);
+ n=respond("",m_ok,0);mttl_pull_init(&st,1);run_check(&st,response_buf,n,0,&m,1);check(st.error==MTTL_PULL_E_HTTP);
+ n=respond("",m_ok,(long)strlen(m_ok)+1);mttl_pull_init(&st,1);run_check(&st,response_buf,n,0,&m,1);check(st.error==MTTL_PULL_E_HTTP&&m.closed);
+ {static char pad[1100];memset(pad,0,sizeof(pad));strcpy(pad,"X-Pad: ");memset(pad+7,'a',1000);strcat(pad,"\r\n");n=respond(pad,m_ok,(long)strlen(m_ok));
+  mttl_pull_init(&st,1);run_check(&st,response_buf,n,0,&m,1);check(st.error==MTTL_PULL_E_HTTP&&m.at==MTTL_PULL_HEAD_MAX);}
+ n=(size_t)snprintf(response_buf,sizeof(response_buf),"HTTP/1.0 404 Not Found\r\nContent-Length: 0\r\n\r\n");mttl_pull_init(&st,1);run_check(&st,response_buf,n,0,&m,1);check(st.error==MTTL_PULL_E_HTTP);
+ /* Authenticity and policy errors surface; nothing unverified is offered. */
+ {static char bad[1200];char *p;strcpy(bad,m_ok);p=strstr(bad,"\"size\":1000");p[8]='2';n=respond("",bad,(long)strlen(bad));
+  mttl_pull_init(&st,1);run_check(&st,response_buf,n,0,&m,1);check(st.error==MTTL_PULL_E_SIGNATURE&&!st.manifest.build_id[0]);
+  check(mttl_pull_status_json(&st,1,json,sizeof(json))&&!strstr(json,"build_id"));}
+ n=respond("",m_ok,(long)strlen(m_ok));mttl_pull_init(&st,1);run_check(&st,response_buf,n,0,&m,0);check(st.error==MTTL_PULL_E_TIME);
+ /* Deadlines: refused connect (5 s), 10 s idle, 15 s total for a slow drip. */
+ mttl_pull_init(&st,1);{mttl_pull_io io;static uint8_t work[MTTL_PULL_CHECK_WORK];uint8_t pk[32];static const uint16_t cur[3]={2,1,1};unhex(rfc[0].pk,pk);
+  mttl_pull_mock_init(&m,&io,(const uint8_t *)response_buf,n,0);m.refuse=1;mttl_pull_check_run(&st,&io,0xc0a8000au,8080,pk,1800000000u,1,cur,work);
+  check(st.error==MTTL_PULL_E_HTTP&&m.clock-0xfffff000u==MTTL_PULL_CONNECT_MS&&!m.sent_n);
+  mttl_pull_init(&st,1);mttl_pull_mock_init(&m,&io,(const uint8_t *)response_buf,n,0);m.stall_at=60;mttl_pull_check_run(&st,&io,0xc0a8000au,8080,pk,1800000000u,1,cur,work);
+  check(st.error==MTTL_PULL_E_HTTP&&m.clock-0xfffff000u>=MTTL_PULL_IDLE_MS&&m.clock-0xfffff000u<MTTL_PULL_IDLE_MS+200&&m.closed);
+  mttl_pull_init(&st,1);mttl_pull_mock_init(&m,&io,(const uint8_t *)response_buf,n,1);m.delay=100;mttl_pull_check_run(&st,&io,0xc0a8000au,8080,pk,1800000000u,1,cur,work);
+  check(st.error==MTTL_PULL_E_HTTP&&m.clock-0xfffff000u>=MTTL_PULL_MANIFEST_MS&&m.clock-0xfffff000u<=MTTL_PULL_MANIFEST_MS+1&&m.at<n);}
+ /* A check can never start while one is installing; failure leaves no retry. */
+ mttl_pull_init(&st,1);n=respond("",m_ok,(long)strlen(m_ok));run_check(&st,response_buf,n,0,&m,1);check(mttl_pull_install_begin(&st,"0123456789abcdef",1800000000u,1));
+ check(!run_check(&st,response_buf,n,0,&m,1)&&!m.opened&&st.state==MTTL_PULL_INSTALLING);
+ mttl_pull_install_failed(&st,MTTL_PULL_E_DIGEST);check(mttl_pull_status_json(&st,1,json,sizeof(json))&&!strncmp(json,"{\"state\":5,\"error\":10,",22));
+ /* Image GET: Content-Length handed back; read never passes it. */
+ {mttl_pull_io io;mttl_pull_conn c;uint8_t head[MTTL_PULL_HEAD_MAX],b[64];uint32_t len;
+  n=(size_t)snprintf(response_buf,sizeof(response_buf),"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhelloEXTRA");
+  mttl_pull_mock_init(&m,&io,(const uint8_t *)response_buf,n,0);
+  check(mttl_pull_get(&c,&io,0x0a000001u,80,"/a/b.fwr",MTTL_PULL_IMAGE_MS,head,&len)==MTTL_PULL_OK&&len==5&&!memcmp(m.sent,"GET /a/b.fwr HTTP/1.0\r\n",23));
+  check(mttl_pull_read(&c,b,sizeof(b))==5&&!memcmp(b,"hello",5)&&!mttl_pull_read(&c,b,sizeof(b)));mttl_pull_close(&c);
+  check(mttl_pull_get(&c,&io,0x0a000001u,80,"/a/../b",MTTL_PULL_IMAGE_MS,head,&len)==MTTL_PULL_E_HTTP);}
 }

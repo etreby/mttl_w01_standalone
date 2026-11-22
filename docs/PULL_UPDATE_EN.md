@@ -1,9 +1,9 @@
 # Pull update check: manifest contract
 
-Status: **contract and host-tested logic only.** The device-side HTTP fetch,
-install handler and dashboard buttons are **not** in the firmware image yet
-(see [What is implemented](#what-is-implemented)). Nothing here starts an
-update on its own.
+Status: **implemented in the OTA firmware image, host-tested, not yet
+validated on hardware** (see [What is implemented](#what-is-implemented) and
+[Hardware-only checks](#hardware-only-checks)). Nothing here starts an update
+on its own.
 
 ## Principles
 
@@ -28,6 +28,10 @@ update on its own.
 names, no credentials, no path, no query. The IPv4 address must be in an
 RFC 1918 range (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`); the port
 is required (1–65535). Example: `http://192.168.0.10:8080`.
+
+It is empty (pull disabled) by default and set in the dashboard Firmware tab
+or with `POST /api/pull/base`; `GET /api/config` reports it as `pull_base`
+([HTTP API](HTTP_API_EN.md#pull-update-apipull)).
 
 ## Requests made by the device
 
@@ -150,46 +154,107 @@ States: `disabled` (no base URL) → `idle` → `checking` → `available` |
 `current` (not newer) | `failed` (error code); `available` → `installing`
 only on an explicit *Install* naming the displayed `build_id` while the
 manifest is still unexpired; a failed install returns to `failed` and never
-retries by itself.
+retries by itself. Changing or clearing the base URL resets the state, so a
+manifest verified from one server is never installed from another.
 
-Error codes: `malformed`, `signature`, `expired`, `time` (clock not
-synchronised), `not_newer`, `size`, `http`, `redirect`.
+`GET /api/pull/status` reports them as numbers (`firmware/pull_update.h`):
+
+| `state` | | `error` | |
+|---|---|---|---|
+| 0 | `disabled` | 0 | none |
+| 1 | `idle` | 1 | `malformed` |
+| 2 | `checking` | 2 | `signature` (also: verifier unavailable, see `rom_ready`) |
+| 3 | `available` | 3 | `expired` |
+| 4 | `current` | 4 | `time` (clock not synchronised) |
+| 5 | `failed` | 5 | `not_newer` |
+| 6 | `installing` | 6 | `size` (manifest size, or image `Content-Length` ≠ `size`) |
+| | | 7 | `http` (connect/send/receive, timeouts, status, framing, limits) |
+| | | 8 | `redirect` |
+| | | 9 | `state` |
+| | | 10 | `digest`: image SHA-256 ≠ signed `sha256`; nothing activated |
+| | | 11 | `install`: owner hold, geometry/running slot, flash or activation failed |
 
 ## What is implemented
 
 Implemented and covered by the host self-test
-(`source/standalone/run_host_selftest.sh`):
+(`source/standalone/run_host_selftest.sh`, 2343 checks):
 
-- `firmware/ed25519_verify.c`: verify-only Ed25519 derived from public-domain
+- `firmware/ed25519_verify.c`: host reference verifier derived from public-domain
   TweetNaCl; RFC 8032 section 7.1 TEST 1, 2, 3, 1024 and SHA(abc) plus
-  negative cases (altered R/S/message, other key, `S + L`, off-curve key,
-  zero signature) and SHA-512 known answers.
+  negative cases. **Never linked into the device image.**
+- `firmware/ed25519_rom.c`: mask-ROM wrapper with its known-answer gate,
+  tested with TweetNaCl standing in for the ROM and with broken verifiers.
 - `firmware/pull_update.c`: base-URL validation, request builder, response
   head checks (redirects refused), strict manifest parser, canonicalisation,
   policy checks and the explicit-action state machine, tested against
   manifests produced by `pull_manifest.py`.
+- `firmware/pull_client.c`: the HTTP/1.0 client and the check flow over
+  socket callbacks: one connection, request bytes, head read byte by byte up
+  to the blank line (≤ 1024 bytes, so no body byte is consumed with it),
+  `Content-Length` required, `Transfer-Encoding` and 3xx refused, manifest
+  body ≤ 1024 bytes, 5 s connect, 10 s idle, 15 s manifest and 180 s image
+  totals, `GET /api/pull/status` JSON. Tests use a scripted socket with a fake
+  clock (any chunking, partial sends, early close, stall, slow drip, refused
+  connect, tick wrap-around).
+- Install streaming: the real `firmware/comMTTL-W01_2.1.1.fwr` is served over
+  the scripted socket and streamed by `mttl_pull_read` through
+  `mttl_ota_upload_stream` (the loop shared with `POST /api/firmware/upload`)
+  in ≤ 256-byte chunks; the raw SHA-256 must equal the signed value and the
+  decoded image must equal the Python reference decoder's. A flipped byte
+  fails verification; an early close fails the stream.
+- Settings: the base URL is stored as IPv4 + port (`firmware/settings.c`).
+  Without a URL the flash record is the unchanged version-3 record,
+  byte-identical to what earlier firmware wrote (fixture test). With a URL the
+  record uses tag `0x84` (version 3 + 6 bytes). Web (version-7) configuration
+  bodies never carry or clear it. Older firmware cannot read tag `0x84`:
+  **clear the OTA server URL before downgrading.**
 
-Not implemented on the device, because it does not fit the current RAM image
-(the whole image, code included, runs from SRAM; after the PIN feature only
-276 bytes remain before the MSP reserve):
+On the device (OTA build profile, `MTTL_OTA_TEST`):
 
-| Component | Cortex-M3 `-Os` size |
-|---|---|
-| `ed25519_verify.c` | 5,660 bytes code/constants + 4,928 bytes static workspace (can live in TCM) |
-| `pull_update.c` | 2,821 bytes |
-| Socket client, `/api/update/check` and `/api/update/install` handlers, settings field, dashboard buttons | not written; estimated 1.5–2.5 KB |
+- **Where the client runs.** Check and install run synchronously inside their
+  POST handlers on the single httpd thread, exactly like
+  `POST /api/firmware/upload`: the OTA session, the energy/owner hold and the
+  HTTP scratch buffer already have that single owner, and the owner hold
+  waits for the worker task, so the install cannot run on the worker. The
+  worker also owns relays, protection and MQTT and has a 30 s watchdog, so it
+  must not block for 15–180 s. While a check (≤ 15 s) or install (≤ 180 s)
+  runs, other HTTP requests wait; nothing else is blocked.
+- **Where the signature is verified.** The ROM verifier's stack use is
+  unknown (ref10-style, estimated 2.5–3.5 KB) and the httpd stack is 4 KB, so
+  `mttl_ed25519_verify` hands the verification (and the lazy known-answer
+  test) to the 6 KB worker stack and waits ≤ 5 s for it to be picked up.
+- **Install** answers the POST first (`202`), then: GET the signed `url`,
+  require `Content-Length == size`, and run the same install function as the
+  upload (owner hold, geometry/running-slot check, stream into the OTA
+  session, raw SHA-256 compare against the signed `sha256`, activation,
+  reboot after 1 s). Failures abort the session, release the hold and set
+  `failed` with `digest`, `install`, `size` or `http`.
+- **Buffers.** Check: head + manifest share one 1024-byte buffer, plus 384
+  bytes of verify scratch, inside the existing 1792-byte HTTP scratch union
+  (TCM); no heap allocation. Install: decoder state + 1024-byte head buffer,
+  reused for 256-byte chunks, in the same union. Persistent pull state: 232
+  bytes in TCM. Socket: the MQTT plaintext adapter (`sdk_mqtt_socket.c`).
+- **Memory budget** (OTA image, `builder/linux_build.py`): static gap to the
+  MSP reserve 1368 bytes (was 6504 before the pull client). To fit, own
+  statics `published`, `life`, `scan_cache`, the OTA `session` and the button
+  inputs moved from main RAM to the TCM `.mttl.cache` section, which
+  `setup()` now zeroes before any task starts (the build's setup emulator
+  checks this); the TCM newlib tail shrinks from 16504 to 15112 bytes.
+- Dashboard (Firmware tab): OTA server URL field, *Check for update*,
+  offered version/build/size/expiry, and a separate *Install* button behind a
+  `confirm()`; progress and reconnect reuse the upload's reconnect logic.
 
-Worst-case verification stack from `-fstack-usage`: about 0.85 KB (SHA-512
-block function 496 bytes under the 304-byte verifier frame), within the 4 KB
-httpd stack. Verification time on the device has not been measured.
+### Hardware-only checks
 
-The RTL8710 ROM exports `rom_ed25519_verify_signature`,
-`rom_ed25519_crypto_sign_verify_detached` and `rom_sha512*` (see the SDK's
-`export-rom_v03.txt`), which would remove most of the 5.6 KB. The SDK ships
-no prototypes for them and the ROM cannot be executed in this environment,
-so they are not used: a guessed calling convention must never gate firmware
-activation. Using them would need a known-answer self-test (one valid and one
-invalid RFC 8032 vector) before every use, and hardware validation.
-
-Mbed TLS 2.16.1 in the SDK has no EdDSA (only Curve25519 ECDH), so it cannot
-provide this verification.
+- ROM `rom_ed25519_crypto_sign_verify_detached`: call ABI, stack use on the
+  worker, run time, and that the known-answer test passes (`rom_ready: 1`).
+- lwIP: one more TCP socket while SSE, MQTT and NTP sockets are open; behaviour
+  with the device in setup-AP mode (the check simply fails with `http`).
+- End-to-end install from a real LAN server, reboot into the new image,
+  dashboard reconnect; failure paths with a wrong image and a pulled cable.
+- Statics moved to TCM (GPIO button state, Wi-Fi scan cache, OTA session,
+  worker status/lifecycle): normal operation after the move.
+- Runtime heap: four more page registrations (about 16–20 bytes each).
+- The expiry check trusts the unauthenticated SNTP clock: an attacker who can
+  spoof NTP *and* replay an old signed manifest could get an expired (but
+  validly signed, newer) image offered; the signature still pins the image.

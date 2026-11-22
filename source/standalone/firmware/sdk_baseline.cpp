@@ -1,5 +1,6 @@
 /* SDK entry point. Peripheral startup requires the network build profile. */
 #include <Arduino.h>
+#include <string.h>
 extern "C" {
 #include "core.h"
 #include "sdk_worker.h"
@@ -22,7 +23,10 @@ extern "C" const char mttl_test_profile[] = "NETWORK_TEST_NO_OTA_RAM_SETTINGS";
 volatile const char *mttl_test_profile_view;
 volatile int mttl_network_start_result;
 #endif
+extern "C" char __mttl_cache_start[],__mttl_cache_end[];
 void setup() {
+    /* TCM .mttl.cache is NOLOAD: zero it before any task can use it. */
+    memset(__mttl_cache_start,0,(size_t)(__mttl_cache_end-__mttl_cache_start));
     mttl_version_view = mttl_firmware_version;
 #ifdef MTTL_NETWORK_TEST
     mttl_test_profile_view = mttl_test_profile;

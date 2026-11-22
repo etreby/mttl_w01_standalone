@@ -68,8 +68,8 @@ void mttl_sdk_watchdog_tick(void){
 }
 static uint8_t relay_known,relay_on,relay_fault;
 static uint8_t relay_desired,buttons_ready,provision_requested;
-static gpio_t button_pins[5];
-static mttl_button_input button_inputs[5];
+static gpio_t button_pins[5] __attribute__((section(".mttl.cache"))); /* TCM, zeroed in setup() */
+static mttl_button_input button_inputs[5] __attribute__((section(".mttl.cache")));
 /* Stock BSP command bit 16 drives PC3, separate from relay LED frames. */
 static gpio_t setup_led;
 static uint32_t setup_led_at;
@@ -135,6 +135,29 @@ int mttl_sdk_energy_barrier(void){unsigned i;int result=0;
  for(i=0;i<100;i++){uint8_t state;taskENTER_CRITICAL();state=energy_barrier_state;taskEXIT_CRITICAL();if(state>=2){result=state==2;break;}vTaskDelay(20/portTICK_RATE_MS+1);}
  if(!result)mttl_sdk_energy_release();return result;
 }
+#ifdef MTTL_ED25519_ROM
+#include "ed25519_rom.h"
+#include "ed25519_verify.h"
+/* The mask-ROM Ed25519 verifier is ref10-style and its stack use cannot be
+ * measured here (estimated 2.5-3.5 KiB). Pull checks run on the 4 KiB httpd
+ * stack, so the verification (and its one-time known-answer test) is handed
+ * to this 6 KiB worker stack and called from the top of the worker loop. */
+static const uint8_t *verify_sig,*verify_pk;static uint8_t *verify_buf;static size_t verify_len;
+static volatile uint8_t verify_state; /* 0 idle, 1 queued, 2 running, 3 valid, 4 invalid */
+int mttl_ed25519_verify(const uint8_t sig[64],const uint8_t pk[32],uint8_t *buf,size_t len){
+ unsigned i;uint8_t state;
+ taskENTER_CRITICAL();if(!worker_started||verify_state){taskEXIT_CRITICAL();return 0;}
+ verify_sig=sig;verify_pk=pk;verify_buf=buf;verify_len=len;verify_state=1;taskEXIT_CRITICAL();
+ for(i=0;;i++){vTaskDelay(20/portTICK_RATE_MS+1);
+  taskENTER_CRITICAL();state=verify_state;if(state>=3||(state==1&&i>=250))verify_state=0;taskEXIT_CRITICAL(); /* not picked up in 5 s: withdrawn */
+  if(state!=2&&(state!=1||i>=250))return state==3;}
+}
+static void verify_service(void){int go,ok;
+ taskENTER_CRITICAL();go=verify_state==1;if(go)verify_state=2;taskEXIT_CRITICAL();if(!go)return;
+ ok=mttl_ed25519_rom_verify(verify_sig,verify_pk,verify_buf,verify_len);
+ taskENTER_CRITICAL();verify_state=ok?3:4;taskEXIT_CRITICAL();
+}
+#endif
 void mttl_sdk_energy_release(void){taskENTER_CRITICAL();energy_barrier_state=0;taskEXIT_CRITICAL();}
 static mttl_sdk_mqtt_socket mqtt_socket;
 static mttl_mqtt_io mqtt_io;
@@ -147,6 +170,7 @@ static size_t device_size;
 static mttl_settings pending_config __attribute__((section(".mttl.cache")));
 static uint8_t config_ready;
 static uint8_t config_keep_password;
+static uint8_t config_pull_set; /* 1: apply pending_config's pull server; 0: keep the stored one */
 static int timer_config_request(uint8_t channel,uint16_t minutes){
  int ok=0;
  taskENTER_CRITICAL();
@@ -159,7 +183,8 @@ static int timer_config_request(uint8_t channel,uint16_t minutes){
  taskEXIT_CRITICAL();return ok;
 }
 static uint8_t ready,ap_ready,stop_phase;
-static mttl_worker_status published;
+/* TCM (.mttl.cache, zeroed in setup()) keeps main RAM for the image. */
+static mttl_worker_status published __attribute__((section(".mttl.cache")));
 static uint32_t rssi_polled_at;
 static int cached_rssi;
 static uint8_t cached_rssi_valid;
@@ -197,9 +222,20 @@ void mttl_sdk_buttons_poll(void){unsigned i;uint32_t now;if(!buttons_ready)retur
 static __attribute__((noinline)) size_t config_snapshot(char *out,size_t cap){mttl_settings copy;int persistent;size_t n;taskENTER_CRITICAL();copy=device.settings;persistent=device.persistent;taskEXIT_CRITICAL();n=mttl_settings_json(&copy,persistent,out,cap);{volatile uint8_t *p=(volatile uint8_t *)&copy;size_t i;for(i=0;i<sizeof(copy);i++)p[i]=0;}return n;}
 size_t mttl_sdk_device_json(char *out,size_t cap,int settings){size_t n;if(settings)return config_snapshot(out,cap);taskENTER_CRITICAL();n=device_size;if(n&&n<cap){memcpy(out,device_json,n+1);}else n=0;taskEXIT_CRITICAL();return n;}
 int mttl_sdk_settings_persistent(void){return device.persistent!=0;}
+/* Opt-in pull-update server: only POST /api/pull/base changes it. */
+void mttl_sdk_pull_base(uint32_t *ip,uint16_t *port){taskENTER_CRITICAL();*ip=device.settings.pull_ip;*port=device.settings.pull_port;taskEXIT_CRITICAL();}
+int mttl_sdk_pull_base_request(uint32_t ip,uint16_t port){
+ int ok=0;
+ if(!mttl_settings_pull_valid(ip,port))return 0;
+ taskENTER_CRITICAL();
+ if((ap_ready||published.state==MTTL_NET_ONLINE)&&!occupied&&!config_occupied&&!energy_barrier_state){
+   pending_config=device.settings;pending_config.pull_ip=ip;pending_config.pull_port=port;
+   config_keep_password=1;config_pull_set=1;config_occupied=config_ready=1;ok=1;}
+ taskEXIT_CRITICAL();return ok;
+}
 int mttl_sdk_config_reserve(const uint8_t *body,size_t n,int keep_password){int ok=0;mttl_settings candidate;if(!mttl_settings_unpack(body,n,&candidate))return 0;taskENTER_CRITICAL();if((ap_ready||published.state==MTTL_NET_ONLINE)&&!occupied&&!config_occupied&&!energy_barrier_state){pending_config=candidate;config_keep_password=keep_password!=0;config_occupied=1;ok=1;}taskEXIT_CRITICAL();{volatile uint8_t *p=(volatile uint8_t *)&candidate;size_t i;for(i=0;i<sizeof(candidate);i++)p[i]=0;}return ok;}
 void mttl_sdk_config_release(int accepted){taskENTER_CRITICAL();if(config_occupied){if(accepted)config_ready=1;else{memset(&pending_config,0,sizeof(pending_config));config_occupied=0;}}taskEXIT_CRITICAL();}
-static mttl_lifecycle life;
+static mttl_lifecycle life __attribute__((section(".mttl.cache")));
 static uint8_t scan_requested;
 static uint8_t manual_setup;
 static uint32_t wifi_retry_at;
@@ -294,6 +330,9 @@ static void worker(void *p){
     for(;;){
         int scan_now=0,config_now;
         watchdog_worker_at=clock_ms(0);watchdog_worker_seen=1;
+#ifdef MTTL_ED25519_ROM
+        verify_service();
+#endif
         taskENTER_CRITICAL();device.control.known_mask=relay_known;device.control.on_mask=relay_on;device.control.fault=relay_fault;taskEXIT_CRITICAL();
         timer_service(clock_ms(0));
         /* Same MQTT socket owner, but bypass slow sensor/storage work while
@@ -318,14 +357,14 @@ static void worker(void *p){
         if(config_now&&storage_begin()){
             memcpy(pending_config.ssid,device.settings.ssid,33);memcpy(pending_config.wifi_password,device.settings.wifi_password,65);
             if(config_keep_password)memcpy(pending_config.mqtt_password,device.settings.mqtt_password,65);
-            mttl_settings_keep_energy(&pending_config,&device.settings);
+            {uint32_t ip=pending_config.pull_ip;uint16_t port=pending_config.pull_port;mttl_settings_keep_energy(&pending_config,&device.settings);if(config_pull_set){pending_config.pull_ip=ip;pending_config.pull_port=port;}}
             /* Flash operations never run with scheduler/interrupts disabled. */
             if(mttl_settings_valid(&pending_config)&&mttl_sdk_settings_save(&pending_config)==1){
               if(memcmp(&device.settings.schedule,&pending_config.schedule,sizeof(pending_config.schedule)))schedule_state.primed=0;
               {int mqtt_changed=mttl_settings_mqtt_changed(&device.settings,&pending_config);
               taskENTER_CRITICAL();device.settings=pending_config;mttl_timer_tick(&device.timers,device.settings.timer_minutes,relay_known,relay_on,clock_ms(0));if(mqtt_changed)++device.revision;device.persistent=1;taskEXIT_CRITICAL();}device.protection.current_count=device.protection.power_count=0;}
             storage_end();
-            taskENTER_CRITICAL();wipe((char *)&pending_config,sizeof(pending_config));config_ready=config_occupied=0;device.mqtt_timer_known=0;taskEXIT_CRITICAL();
+            taskENTER_CRITICAL();wipe((char *)&pending_config,sizeof(pending_config));config_ready=config_occupied=config_pull_set=0;device.mqtt_timer_known=0;taskEXIT_CRITICAL();
         }
         taskENTER_CRITICAL();
         if(ready){manual_setup=1;if(mttl_wifi_submit(&life.network,(const uint8_t *)requested_ssid,length(requested_ssid,32),(const uint8_t *)requested_password,length(requested_password,64),clock_ms(0))){life.join_started=life.dhcp_started=0;}
