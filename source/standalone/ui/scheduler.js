@@ -2,7 +2,7 @@
 (function(root){
  'use strict';
  const empty=()=>({minute:0,mode:0,day:0,channel:0,on:0});
- const defaults=()=>({timezone:540,rules:Array.from({length:8},empty)});
+ const defaults=()=>({timezone:120,rules:Array.from({length:8},empty)});
  function encode(c){const b=new Uint8Array(50),v=new DataView(b.buffer);if(!Number.isInteger(c.timezone)||c.timezone< -720||c.timezone>840||c.timezone%15||c.rules.length!==8)throw Error('Schedule');v.setInt16(0,c.timezone,true);
   c.rules.forEach((r,i)=>{const mode=r.mode&127;if(![r.minute,r.mode,r.day,r.channel,r.on].every(Number.isInteger)||r.mode<0||r.mode>255||mode>4||r.minute<0||r.minute>=1440||r.channel<0||r.channel>4||r.on<0||r.on>1||r.day<0||r.day>127||(!mode&&(r.mode||r.minute||r.day||r.channel||r.on))||(mode===2&&!r.day)||(mode===3&&(r.day<1||r.day>31))||([1,4].includes(mode)&&r.day))throw Error('Schedule');const p=2+i*6;v.setUint16(p,r.minute,true);b.set([r.mode,r.day,r.channel,r.on],p+2);});return Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');
  }

@@ -1,5 +1,5 @@
 #include "scheduler.h"
-void mttl_schedule_default(mttl_schedule_config *c){unsigned i;c->timezone=540;for(i=0;i<8;i++){c->rules[i].minute=0;c->rules[i].mode=c->rules[i].day=c->rules[i].channel=c->rules[i].on=0;}}
+void mttl_schedule_default(mttl_schedule_config *c){unsigned i;c->timezone=120; /* UTC+2 (Cairo, standard time); fixed offset, no DST */for(i=0;i<8;i++){c->rules[i].minute=0;c->rules[i].mode=c->rules[i].day=c->rules[i].channel=c->rules[i].on=0;}}
 int mttl_schedule_valid(const mttl_schedule_config *c){unsigned i;if(!c||c->timezone< -720||c->timezone>840||c->timezone%15)return 0;
  for(i=0;i<8;i++){const mttl_schedule_rule *r=&c->rules[i];unsigned mode=r->mode&127;
   if(mode>4||r->minute>=1440||r->channel>4||r->on>1)return 0;

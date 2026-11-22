@@ -158,7 +158,7 @@ Firmware and builder sources and build instructions are available. The builder d
 
 ## Scheduler
 
-1. Open the **Scheduler** tab and select a time zone. The default is UTC+09:00; offsets from UTC−12:00 to UTC+14:00 are available in 15-minute steps. DST is not applied automatically.
+1. Open the **Scheduler** tab and select a time zone. The default is UTC+02:00 (Cairo standard time); offsets from UTC−12:00 to UTC+14:00 are available in 15-minute steps. DST is not applied automatically.
 2. Use **Add rule** to create up to eight rules. Choose the recurrence, time, target channel and ON/OFF action. Each rule can be enabled, disabled or deleted.
 3. **Save to device** persists the rules in flash across reboot.
 
