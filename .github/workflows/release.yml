@@ -1,0 +1,185 @@
+name: release
+
+# Builds the firmware from a version tag with the pinned Linux builder, tests it,
+# signs SHA256SUMS with the release key and publishes a GitHub release.
+# Never contacts a device and never flashes anything. See docs/RELEASING.md.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build and release (vMAJOR.MINOR.PATCH)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      BUILDER_CACHE: ${{ github.workspace }}/.mttl-cache/builder
+      MTTL_HOST_CACHE: ${{ github.workspace }}/.mttl-cache/host
+    steps:
+      - name: Validate tag name
+        run: |
+          set -eu
+          if ! printf '%s' "$TAG" | grep -Eq '^v(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})$'; then
+            echo "::error::tag must look like v2.2.0, got: $TAG"; exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+
+      - name: Install verification dependency
+        run: python3 -m pip install --disable-pip-version-check 'cryptography==50.0.2'
+
+      - name: Check tag matches firmware version
+        run: |
+          set -eu
+          version=$(python3 -c 'import json;print(json.load(open("source/mttl-source.json"))["version"])')
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::tag $TAG does not match source/mttl-source.json version $version"; exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Restore builder and host-test caches
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ env.BUILDER_CACHE }}/downloads
+            ${{ env.BUILDER_CACHE }}/env
+            ${{ env.MTTL_HOST_CACHE }}/mbedtls-mbedtls-2.16.1
+          key: mttl-builder-${{ runner.os }}-${{ hashFiles('builder/dependencies.lock.json', 'builder/linux_build.py') }}
+
+      - name: Host self-test (fixture image)
+        run: source/standalone/run_host_selftest.sh
+
+      - name: Unit tests
+        run: |
+          set -e
+          for t in source/standalone/tests/*.cjs ha-card/test_timer.cjs; do
+            echo "== $t"; node "$t"
+          done
+          python3 source/standalone/tests/test_minify_markup.py
+          python3 source/standalone/tests/test_version.py
+          python3 tools/test_verify_release.py
+
+      - name: Build firmware (pinned SDK and toolchain)
+        run: |
+          set -eu
+          rm -rf "$BUILDER_CACHE/output" "$BUILDER_CACHE/build"
+          python3 builder/linux_build.py --source source --cache "$BUILDER_CACHE"
+
+      - name: Check build output
+        run: |
+          set -eu
+          out=$(find "$BUILDER_CACHE/output" -mindepth 1 -maxdepth 1 -type d)
+          [ "$(printf '%s\n' "$out" | wc -l)" -eq 1 ] || { echo "::error::expected one build output"; exit 1; }
+          python3 - "$out" <<'EOF'
+          import json, os, re, sys
+          from pathlib import Path
+          out = Path(sys.argv[1]); version = os.environ['VERSION']
+          manifest = json.loads((out / 'manifest.json').read_text())
+          fwr = sorted(out.glob('*.fwr'))
+          assert len(fwr) == 1, fwr
+          assert manifest['version'] == version, (manifest['version'], version)
+          assert re.fullmatch(r'[0-9a-f]{16}', manifest['build_id'])
+          assert fwr[0].name == f"comMTTL-W01_{version}-build-{manifest['build_id']}.fwr", fwr[0].name
+          gap = manifest['static_gap_to_msp_bytes']
+          assert manifest['msp_reserve_bytes'] == 4096 and gap >= 4096, f'static gap {gap} B below 4096 B'
+          assert manifest['bin_fwr_roundtrip'] and manifest['ota_write_enabled']
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write(f"BUILD_DIR={out}\nBUILD_ID={manifest['build_id']}\nFWR={fwr[0]}\nSTATIC_GAP={gap}\n")
+          print(f"{fwr[0].name}: static gap to MSP {gap} bytes")
+          EOF
+
+      - name: Tests against the built image
+        run: |
+          set -e
+          MTTL_TEST_FWR="$FWR" source/standalone/run_host_selftest.sh
+          MTTL_TEST_FWR="$FWR" node source/standalone/tests/test_firmware_validate.cjs
+
+      - name: Stage assets and SHA256SUMS
+        run: |
+          set -eu
+          base="comMTTL-W01_${VERSION}-build-${BUILD_ID}"
+          mkdir dist
+          cp "$FWR" "dist/$base.fwr"
+          cp "$BUILD_DIR/manifest.json" "dist/$base.manifest.json"
+          (cd dist && sha256sum "$base.fwr" "$base.manifest.json" > "SHA256SUMS-$VERSION.txt")
+          cat "dist/SHA256SUMS-$VERSION.txt"
+
+      - name: Sign SHA256SUMS
+        env:
+          MTTL_RELEASE_SIGNING_KEY: ${{ secrets.MTTL_RELEASE_SIGNING_KEY }}
+        run: |
+          set -eu
+          python3 -I - "dist/SHA256SUMS-$VERSION.txt" <<'EOF'
+          import base64, binascii, os, sys
+          from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+          raw = os.environ.get('MTTL_RELEASE_SIGNING_KEY', '').strip()
+          if not raw:
+              sys.exit('::error::repository secret MTTL_RELEASE_SIGNING_KEY is not set')
+          try:
+              seed = base64.b64decode(raw, validate=True)
+          except binascii.Error:
+              sys.exit('::error::MTTL_RELEASE_SIGNING_KEY is not valid base64')
+          if len(seed) != 32:
+              sys.exit('::error::MTTL_RELEASE_SIGNING_KEY must decode to a 32-byte Ed25519 seed')
+          path = sys.argv[1]
+          signature = Ed25519PrivateKey.from_private_bytes(seed).sign(open(path, 'rb').read())
+          with open(path + '.sig', 'w') as out:
+              out.write(base64.b64encode(signature).decode() + '\n')
+          print('signed', path)
+          EOF
+
+      - name: Verify signature and hashes against pull_key.h
+        run: python3 tools/verify_release.py --dir dist
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          base="comMTTL-W01_${VERSION}-build-${BUILD_ID}"
+          fwr_sha=$(cut -d' ' -f1 "dist/SHA256SUMS-$VERSION.txt" | head -n1)
+          {
+            echo "MTTL-W01 standalone firmware $VERSION (English-only fork line)."
+            echo
+            echo "- Firmware: \`$base.fwr\`"
+            echo "- Build ID: \`$BUILD_ID\`"
+            echo "- SHA-256: \`$fwr_sha\`"
+            echo "- Static RAM gap to the 4096-byte MSP reserve: $STATIC_GAP bytes"
+            echo "- Built from \`$TAG\` ($GITHUB_SHA) by run $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo
+            echo "Verify before installing: download all assets into one folder, then run"
+            echo "\`python3 tools/verify_release.py --dir <folder>\` from a checkout of this tag."
+            echo "Paste the SHA-256 above into the device's Expected SHA-256 field when uploading."
+            echo
+            echo "Not yet validated on a physical device. Keep wired recovery available."
+          } > release-notes.md
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "MTTL-W01 $VERSION" --notes-file release-notes.md

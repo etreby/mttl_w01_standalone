@@ -5,8 +5,8 @@ Run on the OTA server / release machine, never on the strip. Requires the
 hex characters; keep it offline and out of the repository.
 
   python3 pull_manifest.py pubkey --key seed.hex
-  python3 pull_manifest.py sign --key seed.hex --fwr comMTTL-W01_2.2.0.fwr \
-      --version 2.2.0 --build-id 0123456789abcdef --url /v1/device/firmware/2.2.0.fwr --ttl 86400
+  python3 pull_manifest.py sign --key seed.hex --fwr comMTTL-W01_2.2.1.fwr \
+      --version 2.2.1 --build-id 0123456789abcdef --url /v1/device/firmware/2.2.1.fwr --ttl 86400
   python3 pull_manifest.py verify --pubkey <64 hex> < manifest.json
 """
 import argparse, base64, hashlib, json, re, sys, time

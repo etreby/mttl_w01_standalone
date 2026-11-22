@@ -61,7 +61,7 @@ seven members (unknown or duplicate members are rejected):
 
 | Member | Type | Rule |
 |---|---|---|
-| `version` | string | `MAJOR.MINOR.PATCH`, each 0–999, no leading zeros. Must be newer than the running version (2.1.1). |
+| `version` | string | `MAJOR.MINOR.PATCH`, each 0–999, no leading zeros. Must be newer than the running firmware version (`MTTL_FIRMWARE_VERSION`, 2.2.0 in this source). |
 | `build_id` | string | 16 lowercase hex characters (as in `GET /api/firmware/status`). |
 | `size` | integer | Exact `.fwr` file size, 44–434196 (`0x6a014`). |
 | `sha256` | string | 64 lowercase hex: SHA-256 of the `.fwr` file exactly as served. |
@@ -91,7 +91,9 @@ no prehash, no context) over those bytes. The device rejects non-canonical
 ### Example
 
 Signed with the public RFC 8032 TEST 1 key (`d75a9801…f707511a`); **never use
-that key in production**:
+that key in production**. This is the host self-test vector, which models a
+device running 2.1.1; a real manifest for 2.2.0 firmware must name a newer
+version:
 
 ```json
 {"build_id":"0123456789abcdef","expires_at":1900000000,"sha256":"b12c11491e1daad0b7e1cc36adabe9c9cbc1de3d04243bf06af3270a0d6f7cf2","signature":"n86eaG/Vf6hCRE7HhTA93OCKO2i3gC+hKwRqjLT3nRBl76v7X7P2C7tv2YZ+mcnm5XBJEdGnBhGo8UNbsBBNAQ==","size":1000,"url":"/v1/device/firmware/comMTTL-W01_2.2.0.fwr","version":"2.2.0"}
@@ -111,8 +113,8 @@ key is compiled into the firmware.
 
 ```sh
 python3 source/standalone/pull_manifest.py pubkey --key seed.hex
-python3 source/standalone/pull_manifest.py sign --key seed.hex --fwr comMTTL-W01_2.2.0.fwr \
-    --version 2.2.0 --build-id <16 hex> --url /v1/device/firmware/comMTTL-W01_2.2.0.fwr --ttl 86400
+python3 source/standalone/pull_manifest.py sign --key seed.hex --fwr comMTTL-W01_2.2.1.fwr \
+    --version 2.2.1 --build-id <16 hex> --url /v1/device/firmware/comMTTL-W01_2.2.1.fwr --ttl 86400
 python3 source/standalone/pull_manifest.py verify --pubkey <64 hex> < manifest.json
 ```
 

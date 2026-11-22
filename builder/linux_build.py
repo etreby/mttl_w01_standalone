@@ -29,7 +29,9 @@ HERE = Path(__file__).resolve().parent
 LOCK = json.loads((HERE / "dependencies.lock.json").read_text())
 GCC_LINUX = {
     "url": "https://downloads.arduino.cc/gcc-arm-none-eabi-4.8.3-2014q1-linux64.tar.gz",
-    "sha256": None,  # Not in the Windows lock; recorded in <cache>/tools/gcc.sha256 on first download.
+    # Not in the Windows lock (Windows builds use a different archive); pinned here so a
+    # fresh environment (e.g. the release workflow) never trusts an unverified toolchain.
+    "sha256": "d23f6626148396d6ec42a5b4d928955a703e0757829195fa71a939e5b86eecf6",
 }
 PY_PINS = {"unicorn": "2.1.4", "zopfli": "0.4.3"}
 

@@ -2,7 +2,7 @@
 
 [Project](../README_EN.md)
 
-This documents the API used by the dashboard in the current public firmware, 2.1.1. Local programs can call it without an MQTT broker. This documentation update does not change firmware behavior.
+This documents the API used by the dashboard in the current firmware, 2.2.0 (unchanged from upstream 2.1.1 except the optional `X-MTTL-SHA256` header). Local programs can call it without an MQTT broker. This documentation update does not change firmware behavior.
 
 ## Requirements
 
@@ -98,7 +98,7 @@ The body is the raw `.fwr` file. The whole request header block must fit in 1024
 ```python
 import hashlib, urllib.request
 base = 'http://192.168.0.153'
-data = open('comMTTL-W01_2.1.1.fwr', 'rb').read()
+data = open('comMTTL-W01_2.2.0-build-0123456789abcdef.fwr', 'rb').read()
 request = urllib.request.Request(base + '/api/firmware/upload', data=data, method='POST', headers={
     'Origin': base, 'Content-Type': 'application/x-mttl-fwr',
     'X-MTTL-SHA256': hashlib.sha256(data).hexdigest()})  # or the value published by your OTA server

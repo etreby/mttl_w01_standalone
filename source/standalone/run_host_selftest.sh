@@ -39,9 +39,11 @@ cd "$FW"
 # shellcheck disable=SC2086
 $CC -std=gnu11 -O1 -w -fno-builtin -DMTTL_SDK_FLASH_TEST -DMTTL_SDK_WIFI_TEST -I. -I"$MBED/include" \
   $SOURCES $EXTRA "$OUT/ota_hash_host.c" "$OUT/main.c" -o "$OUT/selftest"
-# Real published .fwr: expected digests come from sha256sum and the Python
-# reference decoder at test time, never from constants in the C code.
-FWR="$HERE/../../firmware/comMTTL-W01_2.1.1.fwr"
+# Real .fwr: expected digests come from sha256sum and the Python reference
+# decoder at test time, never from constants in the C code. Defaults to the
+# historical upstream 2.1.1 fixture; MTTL_TEST_FWR selects another image (the
+# release workflow points it at the freshly built release .fwr).
+FWR=${MTTL_TEST_FWR:-"$HERE/tests/fixtures/comMTTL-W01_2.1.1.fwr"}
 FWR_SHA=$(sha256sum "$FWR" | cut -d' ' -f1)
 DECODED_SHA=$(cd "$HERE/.." && python3 -I -c 'import hashlib,sys;sys.path.insert(0,".");from standalone.ota import inspect_image;print(hashlib.sha256(inspect_image(open(sys.argv[1],"rb").read()).decoded).hexdigest())' "$FWR")
 "$OUT/selftest" "$FWR" "$FWR_SHA" "$DECODED_SHA"
