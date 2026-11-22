@@ -2,7 +2,7 @@
 (function(){
  'use strict';
  const el=id=>document.getElementById(id);let ready=false,busy=false,result=null,detail='';
-const words=['Keep power on. Supported: standalone FWR, stock 1.0.66 or local-patched 1.0.68. Restoring removes standalone web/direct HA.','Firmware file (.fwr)','Update','Ready to update','Not ready to update','Select a valid .fwr file.','Uploading… Keep power on.','Update completed. Reconnecting to Wi-Fi.','Result uncertain. Reconnect and check before retrying.','Update and restart?\nRestoring 1.0.66/1.0.68 removes standalone web/direct HA. Use original provisioning or backend connectivity afterwards.','Restore completed. Check original provisioning or backend connectivity.','This firmware is already installed. No update or reboot is needed.','Update completed, but automatic reconnection timed out. Check the device IP and refresh the page.','Expected SHA-256 (from OTA server, optional)','SHA-256 must be 64 hex characters.'];
+const words=['Keep power on. Supported: standalone FWR, stock 1.0.66 or local-patched 1.0.68. Restoring removes standalone web/direct HA.','Firmware file (.fwr)','Update','Ready to update','Not ready to update','Select a valid .fwr file.','Uploading… Keep power on.','Update completed. Reconnecting to Wi-Fi.','Result uncertain. Reconnect and check before retrying.','Update and restart?\nRestoring 1.0.66/1.0.68 removes standalone web/direct HA. Use original provisioning or backend connectivity afterwards.','Restore completed. Check original provisioning or backend connectivity.','This firmware is already installed. No update or reboot is needed.','Update completed, but automatic reconnection timed out. Check the device IP and refresh the page.','Expected SHA-256 (from OTA server, optional)','SHA-256 must be 64 hex characters.','Rejected by the strip; nothing was installed. Check the file and try again.'];
  let currentBuild=null,reconnecting=false,reconnectUntil=0;
  const pendingKey='mttl.ota.pending-build';
  function remember(id){try{if(id)localStorage.setItem(pendingKey,id);else localStorage.removeItem(pendingKey);}catch(_){}}
@@ -34,7 +34,9 @@ const words=['Keep power on. Supported: standalone FWR, stock 1.0.66 or local-pa
    if(response.ok&&body?.already_installed===true){result=11;detail='';remember(null);return;}
    if(!response.ok||!body?.written||!body?.activated){
     const message=raw.slice(0,2048).replace(/<[^>]*>/g,' ').replace(/[\x00-\x1f\x7f]/g,' ').replace(/\s+/g,' ').trim().slice(0,400);
-    detail='HTTP '+response.status+(message?' · '+message:' · Empty response');throw Error('Server response');
+    detail='HTTP '+response.status+(message?' · '+message:' · Empty response');
+    if(response.status===400&&/nothing activated|no write|Same-origin required|FWR required/.test(message)){result=15;remember(null);return;}
+    throw Error('Server response');
    }
    result=body.restore_version?10:7;detail=body.restore_version||'';ready=false;if(body.restore_version)remember(null);
    else{reconnecting=true;reconnectUntil=Date.now()+120000;setTimeout(reconnect,5000);}
