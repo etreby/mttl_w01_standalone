@@ -12,6 +12,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 from minify_markup import minify_css,minify_html,usage
 parser=argparse.ArgumentParser();parser.add_argument('--ota-test',action='store_true');options=parser.parse_args()
 ROOT=Path(__file__).resolve().parents[1]
+VERSION=json.loads((ROOT/'mttl-source.json').read_text(encoding='utf-8'))['version']
 OUT=ROOT/'standalone/results/sdk'
 if options.ota_test:OUT=ROOT/'standalone/results/network-ota-test/sdk'
 OUT.mkdir(parents=True,exist_ok=True)
@@ -23,15 +24,15 @@ html=html.replace('aria-selected="false" aria-controls="wifi"','aria-selected="t
 html=html.replace('<section id="device" class="active"','<section id="device"')
 html=html.replace('<section id="wifi" role=','<section id="wifi" class="active" role=')
 if options.ota_test:
-    panel='''<section id="firmware" role="tabpanel" aria-labelledby="tab-firmware"><div class="panel">
-<h2>Firmware</h2><div class="sensor"><span>Current version</span><b id="current-firmware-version">2.1.1</b></div>
+    panel=('''<section id="firmware" role="tabpanel" aria-labelledby="tab-firmware"><div class="panel">
+<h2>Firmware</h2><div class="sensor"><span>Current version</span><b id="current-firmware-version">'''+VERSION+'''</b></div>
 <div class="sensor"><span>Build ID</span><b id="current-build-id">—</b></div>
 <p id="ota-hint" class="muted"></p><form id="firmware-form">
 <label id="ota-file-label" for="firmware-picker"></label><input id="firmware-file" type="file" accept=".fwr" hidden>
 <div class="file-picker"><button id="firmware-picker" type="button">Choose file</button><span id="firmware-selected" class="muted" aria-live="polite"></span></div>
 <label id="ota-sha-label" for="firmware-sha"></label><input id="firmware-sha" maxlength="64" spellcheck="false" autocomplete="off">
 <div class="row"><button id="firmware-verify" type="button" hidden></button><button id="firmware-update" class="primary" disabled></button></div></form>
-<div id="firmware-status" class="status" role="status" aria-live="polite"></div><p class="muted">Download firmware only from your OTA server and compare the file SHA-256 with the value it publishes before uploading.</p></div></section>'''
+<div id="firmware-status" class="status" role="status" aria-live="polite"></div><p class="muted">Download firmware only from your OTA server and compare the file SHA-256 with the value it publishes before uploading.</p></div></section>''')
     html,count=re.subn(r'<section id="firmware".*?</section>',lambda _:panel,html,flags=re.S)
     assert count==1,'Missing firmware panel'
     # OTA initialization is bundled with the common controller below: it cannot

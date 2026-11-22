@@ -229,6 +229,15 @@ If a problem during a firmware update makes web OTA unavailable, see the [ST Lin
 
 ## Version History
 
+### 2.2.0 — English-only fork line (unreleased until tagged)
+
+- English-only dashboard, Windows builder and recovery tool; smaller device UI (more free RAM before the stack reserve).
+- Optional `X-MTTL-SHA256` upload check: the device compares the raw FWR SHA-256 with the expected value before activation.
+- Scheduler default time zone UTC+02:00.
+- Linux builder port, host self-test runner and GitHub Actions tests; signed GitHub releases with SHA256SUMS.
+- Storage format unchanged from 2.1.x, so settings and energy should be kept when upgrading from 2.1.x.
+- Not yet validated on a physical device.
+
 ### 2.1.1 — October 22, 2026
 
 - Display the last flash-write time, latest save-attempt status and save-failure count since boot on the power-strip dashboard.
