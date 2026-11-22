@@ -1,7 +1,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),path=require('node:path');
 async function scenario(mode){
- const ids=['ota-hint','ota-file-label','firmware-update','firmware-status','firmware-picker','firmware-selected','firmware-file','language','firmware-form','current-build-id'];
- const nodes=Object.fromEntries(ids.map(id=>[id,{files:[],click(){}}]));nodes.language.onclick=()=>{};
+ const ids=['ota-hint','ota-file-label','firmware-update','firmware-status','firmware-picker','firmware-selected','firmware-file','language','firmware-form','current-build-id','firmware-sha','ota-sha-label'];
+ const nodes=Object.fromEntries(ids.map(id=>[id,{files:[],value:'',click(){}}]));nodes.language.onclick=()=>{};
  let now=0,serial=0,posts=0,reloads=0,build='0123456789abcdef',offline=false;const jobs=new Map();
  const document={documentElement:{lang:'en'},getElementById:id=>nodes[id]};
  const location={reload(){reloads++;}};

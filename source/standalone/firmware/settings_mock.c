@@ -27,7 +27,9 @@ unsigned mttl_settings_mock_tests(void){
     s.mqtt_enabled=1;if(mttl_settings_valid(&s))++failed;
     s.broker[0]='a';s.broker[1]=0;if(!mttl_settings_valid(&s))++failed;
     s.topic[0]='#';if(mttl_settings_valid(&s))++failed;
-    mttl_settings_default(&s);n=mttl_settings_pack(&s,body,sizeof(body));
+    /* Pin the stored record to language 0 so the power-cut cases below can tell the old
+       record (0) from the new one (1); the factory default is now English (1). */
+    mttl_settings_default(&s);s.language=0;n=mttl_settings_pack(&s,body,sizeof(body));
     for(i=0;i<sizeof(memory);i++)((uint8_t *)memory)[i]=255;
     cut=-1;read_fail=0;erase_calls=0;
     if(mttl_settings_load(&io,&workspace,loaded,sizeof(loaded),&size)!=0)++failed;

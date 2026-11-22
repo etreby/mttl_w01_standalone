@@ -1,6 +1,6 @@
 # MTTL-W01 Standalone Firmware
 
-[한국어](README.md) | English
+English documentation
 
 > **Users of 2.0.x are advised to upgrade to 2.1.x or later.** Version 2.0.x repeatedly saves settings and energy data to a small set of fixed flash sectors, which can accumulate wear during prolonged use. Version 2.1.x uses 128KiB circular storage and hourly energy saves to reduce erase frequency and distribute wear. This does not mean an existing device has already exhausted its flash endurance. **On the first upgrade from 2.0.x to 2.1.x, existing settings and energy data are not migrated; Wi-Fi and other settings must be configured again.**
 
@@ -13,7 +13,9 @@ Download and install the FWR below without building it yourself.
 Direct Wi-Fi web control and Home Assistant MQTT integration for the LG U+
 MTTL-W01, without a separate backend or router DNAT.
 
-![MTTL-W01 web dashboard](docs/dashboard.png)
+![English-first MTTL-W01 dashboard preview with synthetic readings](docs/dashboard-dark.png)
+
+[View the mobile dashboard preview](docs/dashboard-dark-mobile.png). The screenshots use synthetic documentation data and show the custom source on this fork branch. The downloadable 2.1.1 FWR below is the original upstream release; it does **not** include this redesigned interface. The custom image has not passed physical-device validation and is not published as a release.
 
 ### Firmware download
 
@@ -47,7 +49,7 @@ Before a planned disconnection, choose a channel that can be operated without di
 - SoftAP Wi-Fi setup/scan, LAN Wi-Fi changes and automatic reconnection
 - Individual/all channel control, physical buttons and LEDs
 - Total power/energy/voltage/current and per-channel power/energy/current/temperature
-- Editable device/channel names, Korean/English UI, NTP and browser-session logs
+- Editable device/channel names, English web UI, NTP and browser-session logs
 - HA MQTT Discovery: five switches and twenty sensors
 - SSE updates, optimistic web controls and confirmed logical-state reporting to HA
 - FWR web OTA, persistent settings/energy and enabled watchdog
@@ -66,7 +68,7 @@ Apple silicon Mac for initial installation. HA requires an MQTT broker/integrati
 
 ## Initial installation: Windows / macOS OTA tool
 
-Use [ttaengz's OTA tools](https://github.com/ttaengz/mttl-w01-matterbridge#펌웨어-업데이트).
+Use [ttaengz's OTA tools](https://github.com/ttaengz/mttl-w01-matterbridge).
 Download the **OTA tool**, not the separate Wi-Fi configuration tool. Follow the
 upstream instructions for supported operating systems and tool controls.
 
@@ -102,6 +104,10 @@ existing registrations so cleanup can reach it.
 Discovery uses `homeassistant`. IDs follow `switch.mttl_<last 7 MAC digits>_sw1`;
 the aggregate switch ends in `_all`. Existing conflicts may cause HA to add a suffix.
 
+## Local HTTP control API
+
+Programs can request individual/all-channel ON/OFF through `POST /api/control` without MQTT. It uses a two-byte binary body and an `Origin` header, not address-bar GET control. See the [request format, responses and Python/JavaScript examples](docs/HTTP_API_EN.md).
+
 ## Subsequent updates: device web OTA
 
 1. Download the latest standalone `.fwr`.
@@ -109,8 +115,13 @@ the aggregate switch ends in `_all`. Existing conflicts may cause HA to add a su
 3. Keep power connected, reconnect after automatic reboot and verify the build.
 
 Do not upload BIN files or full-flash dumps to the standalone updater.
-No manual SHA-256 or token is required; internal image/slot checks remain enabled.
+SHA-256 entry is optional. If you paste the SHA-256 that your OTA server publishes for
+the `.fwr` file into **Expected SHA-256**, the device hashes the raw upload and
+aborts with `SHA-256 mismatch; nothing activated` before activation if it differs.
+Leaving it empty keeps the previous behaviour. Internal image/slot checks remain enabled.
 If transfer disconnects, close other device tabs, check the running build, then retry.
+
+A future opt-in **pull update check** (signed manifest from your own OTA server, explicit check and install clicks only) is specified in [docs/PULL_UPDATE_EN.md](docs/PULL_UPDATE_EN.md). It is not in the firmware image yet.
 
 ## Restore to stock / local firmware
 
@@ -127,7 +138,8 @@ transfer and reboot. Other versions and arbitrary formats are unsupported.
 - To return to standalone, use the **initial-installation OTA tool** described above.
 
 There is no fixed file-digest allowlist. Image format, size, checksum, SHA-256
-receive/readback consistency and slot compatibility are still checked. These
+receive/readback consistency and slot compatibility are still checked; an optional
+expected file SHA-256 (`X-MTTL-SHA256`, see the [HTTP API](docs/HTTP_API_EN.md)) is compared before activation. These
 checks are not signature authentication; use FWR files from trusted sources only.
 The OTA/restore path passed 142 ARM-execution tests with mocked flash;
 restoration to local-patched `1.0.68` and successful boot have been verified on a physical device. Stock `1.0.66` restoration from standalone `2.0.9`, boot into the original setup AP, and normal operation after reprovisioning have also been confirmed on a user's device ([user verification report #2](https://github.com/af950833/mttl_w01_standalone/issues/2)).
@@ -146,7 +158,7 @@ Firmware and builder sources and build instructions are available. The builder d
 
 ## Scheduler
 
-1. Open the **Scheduler** tab and select a time zone. The default is UTC+09:00; offsets from UTC−12:00 to UTC+14:00 are available in 15-minute steps. DST is not applied automatically.
+1. Open the **Scheduler** tab and select a time zone. The default is UTC+02:00 (Cairo standard time); offsets from UTC−12:00 to UTC+14:00 are available in 15-minute steps. DST is not applied automatically.
 2. Use **Add rule** to create up to eight rules. Choose the recurrence, time, target channel and ON/OFF action. Each rule can be enabled, disabled or deleted.
 3. **Save to device** persists the rules in flash across reboot.
 
@@ -308,7 +320,7 @@ If a problem during a firmware update makes web OTA unavailable, see the [ST Lin
 - Automatic month-end/leap-year calculation, missing-date skipping and later-row precedence for conflicts
 - Fixed UTC offset selection, NTP gating and no replay of events missed during reboot or clock correction
 - Atomic batch admission through the existing relay queue, with retries only within the scheduled minute
-- Single-bordered time editor with Korean 오전/오후 and English AM/PM
+- Single-bordered time editor with Korean morning/afternoon markers and English AM/PM
 - Compressed web assets and on-demand settings JSON preserve existing heap/stack reservations
 - Passed 470 scheduler ARM checks plus UI, settings, relay, SSE and memory checks; successful operation confirmed in user device testing
 

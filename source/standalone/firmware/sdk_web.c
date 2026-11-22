@@ -9,6 +9,7 @@
 #ifdef MTTL_OTA_TEST
 #include "ota_test_config.h"
 #include "sdk_ota_runtime.h"
+#include "ota_upload.h"
 #include "sys_api.h"
 #include "FreeRTOS.h"
 #include "task.h"
@@ -51,7 +52,11 @@ static void hex_ssid(const char *ssid,char hex[65]){unsigned i;static const char
 /* HTTP_THREAD_SINGLE: configuration bytes are copied by config_reserve
  * before responding. The input and output never need separate storage. */
 /* Each handler initializes its own bounded output/input before use. */
-static union {char json[1792];uint8_t settings[1024];} http_scratch __attribute__((section(".mttl.cache")));
+static union {char json[1792];uint8_t settings[1024];
+#ifdef MTTL_OTA_TEST
+ mttl_ota_upload upload;
+#endif
+} http_scratch __attribute__((section(".mttl.cache")));
 #define json http_scratch.json
 static int origin_ok(struct httpd_conn *c);
 static void control_page(struct httpd_conn *c){uint8_t body[2];size_t n=0;
@@ -131,7 +136,7 @@ cleanup:
 static void info(struct httpd_conn *c){send(c,version,sizeof(version)-1,"application/json");}
 #ifdef MTTL_OTA_TEST
 static void ota_status(struct httpd_conn *c){
-    uint32_t active=mttl_sdk_ota_probe();int n=snprintf(json,sizeof(json),"{\"version\":\"2.1.1\",\"build_id\":\"" MTTL_OTA_BUILD_ID "\",\"ota_ready\":%s,\"active_slot\":%lu,\"settings_persistent\":%s,\"restore_versions\":[\"1.0.66\",\"1.0.68\"]}",active?"true":"false",(unsigned long)active,mttl_sdk_settings_persistent()?"true":"false");
+    uint32_t active=mttl_sdk_ota_probe();int n=snprintf(json,sizeof(json),"{\"version\":\"2.1.1\",\"build_id\":\"" MTTL_OTA_BUILD_ID "\",\"ota_ready\":%s,\"active_slot\":%lu,\"settings_persistent\":%s,\"restore_versions\":[\"1.0.66\",\"1.0.68\"],\"sha256_header\":true}",active?"true":"false",(unsigned long)active,mttl_sdk_settings_persistent()?"true":"false");
     if(n>0&&(size_t)n<sizeof(json))send(c,json,n,"application/json");else{httpd_response_internal_server_error(c,0);httpd_conn_close(c);}
 }
 static int ota_access(struct httpd_conn *c){
@@ -143,17 +148,20 @@ static int ota_access(struct httpd_conn *c){
     return ok;
 }
 static void ota_upload(struct httpd_conn *c){
-    static const uint8_t seed[16]={0xca,0x59,0x23,0xe7,0xd7,0x9a,0x84,0xe8,0x43,0xb3,0xaf,0xe7,0x94,0xb1,0xaf,0xa7};
-    uint8_t expected[32]={0},key[16],chunk[256];uint32_t received=0;char *value=0;int ok;
+    uint8_t expected[32]={0},chunk[256];uint32_t received=0;char *value=0;int ok;mttl_ota_upload *u=&http_scratch.upload;
     if(!httpd_request_is_method(c,"POST")){httpd_response_method_not_allowed(c,0);goto close;}
     if(!ota_access(c)){httpd_response_bad_request(c,"Same-origin required");goto close;}
     value=0;httpd_request_get_header_field(c,"Content-Type",&value);ok=value&&!strcmp(value,"application/x-mttl-fwr");if(value)httpd_free(value);if(!ok){httpd_response_bad_request(c,"FWR required");goto close;}
+    /* Optional published digest of the raw .fwr; validated before any erase. */
+    value=0;httpd_request_get_header_field(c,"X-MTTL-SHA256",&value);ok=mttl_ota_upload_begin(u,value);if(value)httpd_free(value);if(!ok){httpd_response_bad_request(c,"Malformed X-MTTL-SHA256; no write");goto close;}
     mttl_http_ota_budget(c);
     mttl_sdk_sse_close(); /* Reclaim stream buffer before flash workspace. */
     /* Drain an in-flight pulse and hold its owner BEFORE any OTA flash write. */
     if(!mttl_sdk_energy_barrier()){httpd_response_bad_request(c,"Owner checkpoint/hold failed");goto close;}
     if(!mttl_sdk_ota_begin(c->request.content_len,expected)){mttl_sdk_energy_release();httpd_response_bad_request(c,"Geometry or unique running slot not verified; no write");goto close;}
-    while(received<c->request.content_len){size_t take=c->request.content_len-received,i;int n;if(take>sizeof(chunk))take=sizeof(chunk);n=httpd_request_read_data(c,chunk,take);if(n<=0||(size_t)n>take)goto fail;for(i=0;i<(size_t)n;i++){uint32_t at=received+i;if(at<16)key[at]=(uint8_t)((seed[at]^chunk[i])+1);else chunk[i]^=key[at&15];}if(!mttl_sdk_ota_feed(chunk,n))goto fail;received+=(uint32_t)n;}
+    while(received<c->request.content_len){size_t take=c->request.content_len-received;int n;if(take>sizeof(chunk))take=sizeof(chunk);n=httpd_request_read_data(c,chunk,take);if(n<=0||(size_t)n>take)goto fail;mttl_ota_upload_chunk(u,chunk,(size_t)n);if(!mttl_sdk_ota_feed(chunk,n))goto fail;received+=(uint32_t)n;}
+    /* Compare the published digest before mttl_sdk_ota_finish() can activate. */
+    if(!mttl_ota_upload_verify(u)){mttl_sdk_energy_release();mttl_sdk_ota_abort();httpd_response_bad_request(c,"SHA-256 mismatch; nothing activated");goto close;}
     {int finished=mttl_sdk_ota_finish();if(!finished)goto fail;
      if(finished==2){static const char same[]="{\"already_installed\":true,\"activated\":false,\"rebooting\":false}";mttl_sdk_energy_release();response(c,same,sizeof(same)-1,"application/json");goto close;}}
     {static const char done[]="{\"written\":true,\"activated\":true,\"rebooting\":true}";

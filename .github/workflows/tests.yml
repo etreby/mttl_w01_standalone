@@ -1,0 +1,27 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Firmware self-test (host build with in-tree flash/Wi-Fi mocks)
+        run: source/standalone/run_host_selftest.sh
+      - name: Dashboard and OTA UI tests
+        run: |
+          set -e
+          for t in source/standalone/tests/*.cjs ha-card/test_timer.cjs; do
+            echo "== $t"; node "$t"
+          done
+      - name: Device UI markup minifier tests
+        run: python3 source/standalone/tests/test_minify_markup.py

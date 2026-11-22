@@ -1,27 +1,27 @@
-# Third-party notices / 제3자 라이선스 안내
+# Third-party notices
 
-이 도구는 Windows x64 로컬 테스트용입니다. 시스템 설치, 전역 PATH 변경, 레지스트리 등록, 기기 업로드 기능이 없습니다. 도구와 소스는 선택한 전용 폴더에서 관리합니다. 소스의 빌드 스크립트는 임의 코드를 실행할 수 있으므로 신뢰하는 소스만 사용하십시오.
+This builder is for local Windows x64 use. It makes no system installation, global PATH change, registry registration or automatic device upload. Tools and selected sources live in a dedicated folder. Build scripts can run arbitrary code, so build only trusted sources.
 
-`환경 준비`는 고정된 공식 URL에서 아래 구성 요소를 사용자 PC로 직접 다운로드하고 SHA-256을 확인합니다. 설치 관리자, npm, pip 또는 시스템 패키지 관리자를 실행하지 않습니다. 압축 파일의 링크와 폴더 밖 경로는 거부합니다. 다운로드 서버의 접근 로그에는 일반 다운로드와 마찬가지로 IP 등이 기록될 수 있습니다. 소스나 기기 설정을 업로드하지 않습니다.
+**Prepare environment** downloads the pinned components below directly from their upstream distribution sites and verifies SHA-256. It does not run an installer, npm, pip or a system package manager. It rejects archive links and paths outside the extraction folder. Download servers may log ordinary connection details such as IP addresses. The builder does not upload source or device settings.
 
-## Downloads
+## Downloaded components
 
-- GNU Arm Embedded GCC 4.8.3-2014q1: Arduino 공식 다운로드 서버. GCC/Binutils의 GPL, 라이브러리 예외와 구성 요소별 라이선스가 적용됩니다. 컴파일러 사용 자체가 사용자 소스 전체에 GPL을 적용한다는 뜻은 아닙니다.
-- Ameba Arduino SDK: Ameba-AIoT 공식 저장소의 커밋 `819d5a3252a4294847dc035bc431b1437dddbee3`. 공식 SDK 릴리스와 동일 커밋의 개별 파일 업데이트를 내려받습니다. 최상위 MIT 외에 Arduino LGPL, FreeRTOS 8.1.2 GPL+예외, Realtek 개별 고지가 혼재합니다. SDK를 사용하거나 수정 펌웨어를 배포할 때 해당 조건을 따로 검토해야 합니다.
-- Python 3.12.10 embeddable: python.org. PSF 및 번들 구성 요소 라이선스.
-- Node.js 22.14.0: nodejs.org. MIT 및 번들 구성 요소 라이선스.
-- Unicorn 2.1.4: PyPI의 upstream wheel. 엔진 GPLv2 및 Python 바인딩 등의 개별 조건.
-- Zopfli 0.4.3: PyPI. Apache-2.0 및 구성 요소 고지.
-- Terser 5.44.0와 고정 버전 의존성: npm 공식 registry. BSD/MIT 등 각 패키지의 LICENSE.
+- **GNU Arm Embedded GCC 4.8.3-2014q1:** Arduino's distribution server. GCC/Binutils GPL terms, library exceptions and component licenses apply. Using the compiler does not by itself put all user source under the GPL.
+- **Ameba Arduino SDK:** Ameba-AIoT commit `819d5a3252a4294847dc035bc431b1437dddbee3`. The builder downloads the official SDK release and file overlays from the same commit. Its components include Arduino LGPL, FreeRTOS 8.1.2 GPL with exception, Realtek notices and other terms. Review those terms when using the SDK or distributing modified firmware.
+- **Python 3.12.10 embeddable:** python.org; PSF and bundled component licenses.
+- **Node.js 22.14.0:** nodejs.org; MIT and bundled component licenses.
+- **Unicorn 2.1.4:** upstream PyPI wheel; GPLv2 engine and separate binding terms.
+- **Zopfli 0.4.3:** PyPI; Apache-2.0 and component notices.
+- **Terser 5.44.0 and pinned dependencies:** npm registry; each package's BSD/MIT or other license applies.
 
-정확한 URL, 버전, 크기와 SHA-256은 `dependencies.lock.json`에 기록되어 있습니다. 다운로드 캐시의 원본 archive와 추출된 LICENSE 파일을 보존합니다. 다운로드 방식을 사용한다고 완성 펌웨어의 라이선스 의무가 없어지는 것은 아닙니다.
+Exact URLs, versions, sizes and SHA-256 digests are in `dependencies.lock.json`. Retain original download archives and extracted license files in the cache. Downloading dependencies separately does not remove license obligations for a resulting firmware distribution.
+
+## Vendored source
+
+- **TweetNaCl 20140427** (Daniel J. Bernstein, Bernard van Gastel, Wesley Janssen, Tanja Lange, Peter Schwabe, Sjaak Smetsers): public domain, https://tweetnacl.cr.yp.to/. `source/standalone/firmware/ed25519_verify.c` is a modified verify-only subset (SHA-512, field arithmetic, Ed25519 verification) of `tweetnacl.c` (original SHA-256 `02e65bc3013ff2168983365e55906bc783c4c7e0a60d8100f17bb303a17175c4`). Modifications are listed in the file header. It is currently compiled only into the host self-test, not into the device firmware.
 
 ## Builder EXE
 
-EXE는 Python/Tcl/Tk를 포함하는 PyInstaller one-directory 패키지입니다. 동봉한 `licenses`와 `_internal`의 라이선스 파일을 유지하십시오. Python은 PSF, Tcl/Tk는 해당 고지, PyInstaller는 GPL+배포 예외 조건이 적용됩니다. EXE는 서명되지 않은 테스트 빌드입니다. Windows/보안 프로그램이 경고를 표시하면 확인 없이 실행하도록 우회하지 마십시오.
+The EXE is a PyInstaller one-directory package containing Python/Tcl/Tk. Retain its bundled `licenses` folder and license files under `_internal`. Python uses PSF terms, Tcl/Tk their own notices, and PyInstaller GPL with its bootloader exception. The EXE is an unsigned test build; review Windows or security-product warnings before running it.
 
-이 문서는 법률 검토를 대체하지 않습니다. 소스 공개가 제3자 코드 전체에 대한 새로운 라이선스 부여를 의미하지는 않습니다. 수정 펌웨어의 재배포 조건은 별도로 확인하십시오.
-
-## English
-
-This builder downloads pinned upstream toolchain/SDK/runtime packages directly to your PC, verifies hashes and extracts them into its own folder. It does not install system packages, change persistent PATH/environment/registry settings, or upload firmware or source. Reading third-party terms is required; downloading dependencies does not remove obligations on later firmware redistribution. Keep all upstream notices. The EXE is unsigned. Source publication does not grant a blanket license over third-party components.
+This document is not legal advice. Publishing this project's source does not relicense third-party components. Verify redistribution terms separately for modified firmware.

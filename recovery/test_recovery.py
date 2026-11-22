@@ -72,7 +72,7 @@ class Tests(unittest.TestCase):
             for step in p.steps:backend.write(step)
             self.assertEqual(bytes(backend.flash),p.expected)
     def run_mode(self,write,fail=None):
-        with tempfile.TemporaryDirectory(prefix='recovery test 한글 ') as folder:
+        with tempfile.TemporaryDirectory(prefix='recovery test ünïcödé ') as folder:
             b=Fake(self.dump,fail)
             if fail:
                 with self.assertRaises(RecoveryError):recover(b,folder,FWR,write,lambda s:None,lambda *x:None)
