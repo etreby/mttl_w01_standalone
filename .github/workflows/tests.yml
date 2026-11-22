@@ -23,5 +23,14 @@ jobs:
           for t in source/standalone/tests/*.cjs ha-card/test_timer.cjs; do
             echo "== $t"; node "$t"
           done
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
       - name: Device UI markup minifier tests
         run: python3 source/standalone/tests/test_minify_markup.py
+      - name: Version consistency and release verifier tests
+        run: |
+          set -e
+          python3 -m pip install --disable-pip-version-check 'cryptography==50.0.2'
+          python3 source/standalone/tests/test_version.py
+          python3 tools/test_verify_release.py
